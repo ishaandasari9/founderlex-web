@@ -1,65 +1,721 @@
-import Image from "next/image";
+'use client'
 
-export default function Home() {
+import React, { useState, useRef, useEffect, useCallback, Suspense } from 'react'
+import dynamic from 'next/dynamic'
+import {
+  ArrowRight, ArrowLeft, ArrowUp,
+  MessageSquareText, BookOpen, FileText, ShieldCheck, Download,
+} from 'lucide-react'
+
+// ── React Bits — SSR disabled (motion/react needs window) ────────────────────
+// Cast to any to bypass TypeScript inference quirks from .jsx component files
+const BorderGlow = dynamic(() => import('../components/BorderGlow'), { ssr: false }) as React.ComponentType<any>
+const TiltedCard  = dynamic(() => import('../components/TiltedCard'),  { ssr: false }) as React.ComponentType<any>
+const Counter     = dynamic(() => import('../components/Counter'),      { ssr: false }) as React.ComponentType<any>
+const GlassCard   = dynamic(() => import('../components/about/GlassCard'), { ssr: false }) as React.ComponentType<{
+  children: React.ReactNode
+  className?: string
+  style?: React.CSSProperties
+  onClick?: () => void
+}>
+const DocumentMarquee = dynamic(() => import('../components/about/DocumentMarquee'), { ssr: false }) as React.ComponentType<{
+  items: { key: string; label: string; category: string; color: string }[]
+}>
+const DoorHero    = dynamic(() => import('../components/door/DoorHero'), {
+  ssr: false,
+  loading: () => (
+    <div
+      style={{
+        width: 'min(440px, 86vw)',
+        height: 'clamp(300px, 46vh, 440px)',
+        borderRadius: 24,
+        background: '#F7F2EB',
+      }}
+      aria-hidden
+    />
+  ),
+}) as React.ComponentType<{
+  enterSignal: number
+  exitSignal: number
+  onEnterApp: () => void
+  onExitComplete: () => void
+  onRequestEnter: () => void
+  onTransitionActive?: (active: boolean) => void
+}>
+
+// ── Types ────────────────────────────────────────────────────────────────────
+type Act = 'door' | 'about' | 'chat'
+interface Msg {
+  role: 'user' | 'bot' | 'doc-card'
+  text: string
+  template?: string
+  isLoading?: boolean
+}
+
+// ── Brand tokens ─────────────────────────────────────────────────────────────
+const RED     = '#DB1A1A'
+const CREAM   = '#F7F2EB'
+const INK     = '#2A2420'
+const TILE    = '#F2EAE0'
+const MUTED   = '#6F655B'
+const FAINT   = '#9B8F82'
+const FAINTER = '#B9AC9C'
+const WHITE   = '#FFFFFF'
+
+const BRICOLAGE  = 'var(--font-bricolage), sans-serif'
+const NEWSREADER = 'var(--font-newsreader), Georgia, serif'
+const MONO       = 'var(--font-mono), monospace'
+
+// ── Template metadata ─────────────────────────────────────────────────────────
+const TEMPLATE_LABELS: Record<string, string> = {
+  founders_agreement: "Founders' Agreement",
+  contractor_agreement: 'Contractor Agreement',
+  mutual_nda: 'Mutual NDA',
+  terms_of_service: 'Terms of Service',
+  privacy_policy: 'Privacy Policy',
+  consulting_agreement: 'Consulting Agreement',
+  sow_template: 'Statement of Work',
+  independent_contractor_consulting: 'Independent Contractor Agreement',
+  nonprofit_articles: 'Articles of Incorporation',
+  nonprofit_bylaws: 'Nonprofit Bylaws',
+  nonprofit_conflict_of_interest: 'Conflict of Interest Policy',
+}
+
+const TEMPLATE_KEYWORDS: Record<string, string[]> = {
+  founders_agreement: ["founders' agreement", "founder agreement", "co-founder", "cofounder", "equity split", "vesting schedule", "founders agreement"],
+  contractor_agreement: ['contractor agreement', 'freelancer agreement', 'work for hire'],
+  mutual_nda: ['nda', 'non-disclosure', 'confidentiality agreement', 'mutual nda'],
+  terms_of_service: ['terms of service', 'terms and conditions', 'tos'],
+  privacy_policy: ['privacy policy'],
+  consulting_agreement: ['consulting agreement'],
+  sow_template: ['statement of work', ' sow '],
+  independent_contractor_consulting: ['independent contractor agreement'],
+  nonprofit_articles: ['articles of incorporation', 'nonprofit articles'],
+  nonprofit_bylaws: ['nonprofit bylaws', 'nonprofit by-laws'],
+  nonprofit_conflict_of_interest: ['conflict of interest policy'],
+}
+
+function detectTemplate(text: string): string | null {
+  const lower = text.toLowerCase()
+  for (const [template, keywords] of Object.entries(TEMPLATE_KEYWORDS)) {
+    if (keywords.some(kw => lower.includes(kw))) return template
+  }
+  return null
+}
+
+// ── Download helper ───────────────────────────────────────────────────────────
+async function generateAndDownload(
+  templateName: string,
+  founderDetails: Record<string, string>
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ template_name: templateName, founder_details: founderDetails }),
+    })
+    const data = await res.json()
+    if (data.error) return { ok: false, error: data.error }
+
+    const dl = (b64: string, name: string, mime: string) => {
+      const bytes = atob(b64)
+      const arr = new Uint8Array(bytes.length)
+      for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i)
+      const url = URL.createObjectURL(new Blob([arr], { type: mime }))
+      const a = document.createElement('a')
+      a.href = url; a.download = name; a.click()
+      URL.revokeObjectURL(url)
+    }
+    if (data.pdf_b64)  dl(data.pdf_b64,  data.pdf_name  || 'document.pdf',  'application/pdf')
+    if (data.docx_b64) dl(data.docx_b64, data.docx_name || 'document.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    return { ok: true }
+  } catch (e: unknown) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+// ── Door glyph ───────────────────────────────────────────────────────────────
+function DoorGlyph({ w = 21, h = 24, panelTop = 8, outerR = 11, innerR = 5 }:
+  { w?: number; h?: number; panelTop?: number; outerR?: number; innerR?: number }) {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <span style={{ position: 'relative', display: 'inline-block', width: w, height: h, flexShrink: 0 }}>
+      <span style={{ position: 'absolute', inset: 0, borderRadius: `${outerR}px ${outerR}px 3px 3px`, background: INK }} />
+      <span style={{ position: 'absolute', left: Math.round(w * 0.24), right: Math.round(w * 0.24), bottom: 0, top: panelTop, borderRadius: `${innerR}px ${innerR}px 1px 1px`, background: RED }} />
+    </span>
+  )
+}
+
+// ── Arch pip ─────────────────────────────────────────────────────────────────
+function ArchPip() {
+  return <span style={{ display: 'inline-block', flexShrink: 0, width: 14, height: 8, borderRadius: '8px 8px 0 0', background: RED }} />
+}
+
+// ── Wordmark ─────────────────────────────────────────────────────────────────
+function Wordmark({ size = 25 }: { size?: number }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+      <DoorGlyph />
+      <span style={{ fontFamily: BRICOLAGE, fontWeight: 700, fontSize: size, letterSpacing: '-0.01em', color: INK }}>
+        Founder<span style={{ color: RED }}>Lex</span>
+      </span>
+    </div>
+  )
+}
+
+// ── CTA button ───────────────────────────────────────────────────────────────
+function CtaButton({ children, onClick, lg = false }: { children: React.ReactNode; onClick: () => void; lg?: boolean }) {
+  const [hov, setHov] = useState(false)
+  const [act, setAct] = useState(false)
+  return (
+    <button onClick={onClick}
+      onMouseEnter={() => setHov(true)} onMouseLeave={() => { setHov(false); setAct(false) }}
+      onMouseDown={() => setAct(true)} onMouseUp={() => setAct(false)}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 9,
+        fontFamily: BRICOLAGE, fontWeight: 600, fontSize: lg ? 18 : 17, color: CREAM,
+        background: act ? '#B11414' : hov ? '#C21717' : RED,
+        padding: lg ? '16px 30px' : '15px 26px', borderRadius: 13, border: 'none',
+        boxShadow: '0 18px 32px -14px rgba(219,26,26,0.65)',
+        transform: act ? 'translateY(1px)' : hov ? 'translateY(-1px)' : 'none',
+        transition: 'background .18s ease, transform .18s ease', cursor: 'pointer',
+      }}>
+      {children}
+    </button>
+  )
+}
+
+// ── Suggestion chip ───────────────────────────────────────────────────────────
+function Chip({ label, onSelect }: { label: string; onSelect: (t: string) => void }) {
+  const [hov, setHov] = useState(false)
+  return (
+    <button onClick={() => onSelect(label)} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+      style={{
+        fontFamily: BRICOLAGE, fontWeight: 500, fontSize: 13.5, color: INK,
+        background: hov ? TILE : WHITE, border: `1px solid ${hov ? 'rgba(42,36,32,0.30)' : 'rgba(42,36,32,0.16)'}`,
+        borderRadius: 999, padding: '8px 14px', cursor: 'pointer',
+        transition: 'background .15s ease, border-color .15s ease',
+      }}>
+      {label}
+    </button>
+  )
+}
+
+// ── Back link ─────────────────────────────────────────────────────────────────
+function BackLink({ label, onClick }: { label: string; onClick: () => void }) {
+  const [hov, setHov] = useState(false)
+  return (
+    <button onClick={onClick} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+      style={{
+        position: 'absolute', top: 20, left: 22,
+        display: 'inline-flex', alignItems: 'center', gap: 7,
+        fontFamily: MONO, fontSize: 12, letterSpacing: '0.04em', color: hov ? RED : FAINT,
+        background: 'none', border: 'none', cursor: 'pointer', transition: 'color .15s ease',
+      }}>
+      <ArrowLeft size={14} strokeWidth={1.8} /> {label}
+    </button>
+  )
+}
+
+// ── Send button ───────────────────────────────────────────────────────────────
+function SendButton({ onClick, disabled }: { onClick: () => void; disabled?: boolean }) {
+  const [hov, setHov] = useState(false)
+  const [act, setAct] = useState(false)
+  return (
+    <button onClick={onClick} aria-label="Send" disabled={disabled}
+      onMouseEnter={() => setHov(true)} onMouseLeave={() => { setHov(false); setAct(false) }}
+      onMouseDown={() => setAct(true)} onMouseUp={() => setAct(false)}
+      style={{
+        flexShrink: 0, width: 40, height: 40, borderRadius: 11, border: 'none',
+        background: disabled ? FAINT : act ? '#B11414' : hov ? '#C21717' : RED,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        boxShadow: disabled ? 'none' : '0 8px 16px -8px rgba(219,26,26,0.70)',
+        transform: act ? 'translateY(1px)' : hov ? 'translateY(-1px)' : 'none',
+        transition: 'background .15s ease, transform .15s ease',
+      }}>
+      <ArrowUp size={18} color={CREAM} strokeWidth={2} aria-hidden />
+    </button>
+  )
+}
+
+// ── Back link (chat header, inline) ──────────────────────────────────────────
+function BackChatLink({ onClick }: { onClick: () => void }) {
+  const [hov, setHov] = useState(false)
+  return (
+    <button onClick={onClick} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 5,
+        fontFamily: MONO, fontSize: 11, letterSpacing: '0.04em', color: hov ? RED : FAINT,
+        background: 'none', border: 'none', cursor: 'pointer', transition: 'color .15s ease',
+      }}>
+      <ArrowLeft size={13} strokeWidth={1.8} /> Back
+    </button>
+  )
+}
+
+// ── Document card (TiltedCard wrapper) ───────────────────────────────────────
+function DocCard({
+  template, onGenerate, generating,
+}: { template: string; onGenerate: () => void; generating: boolean }) {
+  const label = TEMPLATE_LABELS[template] ?? template
+
+  const overlay = (
+    <div style={{
+      width: '100%', height: '100%', borderRadius: 14,
+      background: WHITE, border: `1px solid rgba(42,36,32,0.12)`,
+      boxShadow: '0 8px 32px -12px rgba(42,36,32,0.3)',
+      padding: '18px 20px',
+      display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+    }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <span style={{ width: 36, height: 36, borderRadius: 10, background: TILE, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <FileText size={18} color={RED} strokeWidth={1.6} />
+        </span>
+        <span style={{ fontFamily: BRICOLAGE, fontWeight: 600, fontSize: 15, color: INK, lineHeight: 1.25 }}>{label}</span>
+        <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: FAINT }}>PDF + Word</span>
+      </div>
+      <button onClick={generating ? undefined : onGenerate} disabled={generating}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+          background: generating ? TILE : RED, color: generating ? MUTED : CREAM,
+          border: 'none', borderRadius: 9, padding: '9px 14px',
+          fontFamily: BRICOLAGE, fontWeight: 600, fontSize: 13, cursor: generating ? 'wait' : 'pointer',
+          transition: 'background .15s ease',
+        }}>
+        {generating ? (
+          <>
+            <span className="loading-dot" /><span className="loading-dot" /><span className="loading-dot" />
+          </>
+        ) : (
+          <><Download size={13} strokeWidth={2} /> Generate &amp; Download</>
+        )}
+      </button>
+    </div>
+  )
+
+  return (
+    <div style={{ width: 220, flexShrink: 0 }}>
+      <Suspense fallback={
+        <div style={{ width: 220, height: 160, borderRadius: 14, background: WHITE, border: `1px solid rgba(42,36,32,0.10)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <span style={{ fontFamily: MONO, fontSize: 11, color: FAINT }}>Loading…</span>
+        </div>
+      }>
+        <TiltedCard
+          imageSrc="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='160'%3E%3Crect width='220' height='160' fill='%23ffffff' rx='14'/%3E%3C/svg%3E"
+          containerHeight="160px"
+          imageHeight="160px"
+          imageWidth="220px"
+          rotateAmplitude={6}
+          scaleOnHover={1.04}
+          displayOverlayContent
+          overlayContent={overlay}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+      </Suspense>
+    </div>
+  )
+}
+
+// ── Loading bubble ────────────────────────────────────────────────────────────
+function LoadingBubble() {
+  return (
+    <div style={{ display: 'flex', gap: 11, alignItems: 'flex-start', maxWidth: '90%' }}>
+      <DoorGlyph w={28} h={31} panelTop={10} outerR={14} innerR={6} />
+      <div style={{
+        background: TILE, color: INK,
+        padding: '18px 22px',
+        borderRadius: '4px 16px 16px 16px',
+        display: 'flex', alignItems: 'center', gap: 6,
+      }}>
+        <span className="loading-dot" />
+        <span className="loading-dot" />
+        <span className="loading-dot" />
+      </div>
+    </div>
+  )
+}
+
+
+// ── Main page ─────────────────────────────────────────────────────────────────
+export default function Home() {
+  const [act, setAct]               = useState<Act>('door')
+  const [draft, setDraft]           = useState('')
+  const [messages, setMessages]     = useState<Msg[]>([])
+  const [isLoading, setIsLoading]   = useState(false)
+  const [docCount, setDocCount]     = useState(0)
+  const [generatingTpl, setGeneratingTpl] = useState<string | null>(null)
+  const [enterSignal, setEnterSignal]     = useState(0)
+  const [exitSignal, setExitSignal]       = useState(0)
+  const [doorBusy, setDoorBusy]           = useState(false)
+
+  const scrollRef    = useRef<HTMLDivElement>(null)
+  const messagesRef  = useRef<Msg[]>([])
+
+  // Keep ref in sync with state
+  useEffect(() => { messagesRef.current = messages }, [messages])
+
+  // Auto-scroll on new messages
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+  }, [messages])
+
+
+  // ── Send message ────────────────────────────────────────────────────────────
+  const sendMessage = useCallback(async (text: string) => {
+    const t = text.trim()
+    if (!t || isLoading) return
+
+    const currentMsgs = messagesRef.current
+    const apiPayload = [
+      ...currentMsgs
+        .filter(m => (m.role === 'user' || m.role === 'bot') && !m.isLoading)
+        .map(m => ({ role: m.role === 'bot' ? 'assistant' as const : 'user' as const, content: m.text })),
+      { role: 'user' as const, content: t },
+    ]
+
+    setMessages(prev => [...prev, { role: 'user', text: t }, { role: 'bot', text: '', isLoading: true }])
+    setIsLoading(true)
+    setDraft('')
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: apiPayload }),
+      })
+      const data = await res.json()
+      const reply: string = data.content || "I'm sorry, I couldn't process that. Could you rephrase?"
+
+      setMessages(prev => {
+        const next = prev.filter(m => !m.isLoading)
+        const botMsg: Msg = { role: 'bot', text: reply }
+        const result: Msg[] = [...next, botMsg]
+        const tpl = detectTemplate(reply)
+        if (tpl) result.push({ role: 'doc-card', text: '', template: tpl })
+        return result
+      })
+    } catch {
+      setMessages(prev => [
+        ...prev.filter(m => !m.isLoading),
+        { role: 'bot', text: 'Something went wrong. Please check your connection and try again.' },
+      ])
+    } finally {
+      setIsLoading(false)
+    }
+  }, [isLoading])
+
+  // ── Generate + download a document ─────────────────────────────────────────
+  const handleGenerate = useCallback(async (template: string) => {
+    setGeneratingTpl(template)
+    const details: Record<string, string> = {}
+    const result = await generateAndDownload(template, details)
+    if (result.ok) {
+      setDocCount(prev => prev + 1)
+    } else {
+      alert(`Could not generate document: ${result.error ?? 'Unknown error'}`)
+    }
+    setGeneratingTpl(null)
+  }, [])
+
+
+  const handleStepInside = useCallback(() => {
+    if (act !== 'door' || doorBusy) return
+    setEnterSignal(s => s + 1)
+  }, [act, doorBusy])
+
+  const handleEnterApp = useCallback(() => {
+    setAct('about')
+  }, [])
+
+  const handleBackToDoor = useCallback(() => {
+    if (act !== 'about' || doorBusy) return
+    setExitSignal(s => s + 1)
+  }, [act, doorBusy])
+
+  const handleExitComplete = useCallback(() => {
+    setAct('door')
+  }, [])
+
+  const scene = (which: Act, z: number): React.CSSProperties => ({
+    position: 'absolute', inset: 0, zIndex: z,
+    opacity: act === which ? 1 : 0,
+    pointerEvents: act === which ? 'auto' : 'none',
+    transition: which === 'about' ? 'opacity .55s ease' : 'opacity .5s ease',
+  })
+
+  // All 11 templates organized by category
+  const templateCategories = [
+    {
+      label: 'Product', color: '#3A6EA8',
+      items: ['founders_agreement', 'contractor_agreement', 'mutual_nda', 'terms_of_service', 'privacy_policy'],
+    },
+    {
+      label: 'Consulting', color: '#5A8A5A',
+      items: ['consulting_agreement', 'sow_template', 'independent_contractor_consulting'],
+    },
+    {
+      label: 'Nonprofit', color: '#8A5A3A',
+      items: ['nonprofit_articles', 'nonprofit_bylaws', 'nonprofit_conflict_of_interest'],
+    },
+  ]
+
+  const allDocuments = templateCategories.flatMap(({ label, color, items }) =>
+    items.map(key => ({
+      key,
+      label: TEMPLATE_LABELS[key],
+      category: label,
+      color,
+    }))
+  )
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100vh', minHeight: 600, overflow: 'hidden', background: CREAM, color: INK }}>
+
+      {/* Grain overlay */}
+      <div aria-hidden style={{
+        position: 'absolute', inset: 0, zIndex: 80, pointerEvents: 'none',
+        opacity: 0.05, mixBlendMode: 'multiply',
+        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
+        backgroundSize: '140px 140px',
+      }} />
+
+      {/* ══════════════════════════════════════════════════════════════════
+          ACT 1 — THE DOOR
+      ══════════════════════════════════════════════════════════════════ */}
+      <section style={{
+        ...scene('door', act === 'door' || doorBusy ? 30 : 0),
+        opacity: act === 'door' || doorBusy ? 1 : 0,
+        pointerEvents: act === 'door' || doorBusy ? 'auto' : 'none',
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        justifyContent: 'center', gap: 'clamp(24px,5vh,52px)',
+        padding: 'clamp(28px,6vh,64px) 24px', background: CREAM,
+        zIndex: doorBusy ? 300 : act === 'door' ? 30 : 0,
+      }}>
+        {!doorBusy && <Wordmark size={25} />}
+
+        <DoorHero
+          enterSignal={enterSignal}
+          exitSignal={exitSignal}
+          onEnterApp={handleEnterApp}
+          onExitComplete={handleExitComplete}
+          onRequestEnter={handleStepInside}
+          onTransitionActive={setDoorBusy}
+        />
+
+        {!doorBusy && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, textAlign: 'center' }}>
+          <p style={{ margin: 0, fontFamily: NEWSREADER, fontSize: 'clamp(20px,2.2vw,27px)', lineHeight: 1.4, letterSpacing: '-0.01em', color: INK, maxWidth: '22ch' }}>
+            Legal help, finally on your side.{' '}<span style={{ color: FAINTER }}>Open the door.</span>
+          </p>
+          <CtaButton onClick={handleStepInside}>
+            Step inside <ArrowRight size={18} strokeWidth={1.8} />
+          </CtaButton>
+          <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '0.16em', textTransform: 'uppercase', color: FAINTER }}>
+            No login wall · Free to start
+          </span>
+        </div>
+        )}
+      </section>
+
+      {/* ══════════════════════════════════════════════════════════════════
+          ACT 2 — ABOUT
+      ══════════════════════════════════════════════════════════════════ */}
+      <section style={{
+        ...scene('about', act === 'about' ? 30 : 10),
+        overflowY: 'auto',
+        background: 'radial-gradient(125% 90% at 50% 6%, #FFFDF8 0%, #FBF3E4 30%, #F7F2EB 60%)',
+      }}>
+        <BackLink label="Back to the door" onClick={handleBackToDoor} />
+
+        <div className="about-glass-layout" style={{
+          minHeight: '100%', display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center',
+          gap: 'clamp(28px,4.5vh,46px)',
+          padding: 'clamp(72px,10vh,96px) clamp(22px,5vw,40px) clamp(40px,6vh,64px)',
+        }}>
+          {/* Hero — frosted glass panel */}
+          <GlassCard className="about-hero-glass" style={{ width: '100%', maxWidth: 720, padding: 'clamp(28px,4vw,40px) clamp(24px,4vw,36px)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18, textAlign: 'center' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9, fontFamily: MONO, fontSize: 11, letterSpacing: '0.22em', textTransform: 'uppercase', color: FAINT }}>
+                <ArchPip /> You&rsquo;re welcome in
+              </span>
+              <h1 style={{ margin: 0, fontFamily: BRICOLAGE, fontWeight: 600, fontSize: 'clamp(32px,4.8vw,58px)', lineHeight: 1.03, letterSpacing: '-0.025em', color: INK }}>
+                FounderLex explains startup law in plain English.
+              </h1>
+              <p style={{ margin: 0, fontFamily: NEWSREADER, fontSize: 'clamp(18px,1.7vw,21px)', lineHeight: 1.6, color: MUTED, maxWidth: '48ch' }}>
+                A calm place to ask the questions you're afraid sound dumb. You'll walk out with the documents you actually need.
+              </p>
+            </div>
+          </GlassCard>
+
+          {/* Counter stat — only shown after first document is generated */}
+          {docCount > 0 && (
+            <GlassCard style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 28px' }}>
+              <Suspense fallback={<span style={{ fontFamily: BRICOLAGE, fontWeight: 700, fontSize: 36, color: RED }}>{docCount}</span>}>
+                <Counter value={docCount} fontSize={36} fontWeight="700" textColor={RED} gap={2} />
+              </Suspense>
+              <span style={{ fontFamily: BRICOLAGE, fontWeight: 500, fontSize: 16, color: MUTED }}>
+                {docCount === 1 ? 'document generated this session' : 'documents generated this session'}
+              </span>
+            </GlassCard>
+          )}
+
+          {/* 3 interactive glass step cards */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 14, width: '100%', maxWidth: 880 }}>
+            {([
+              { icon: <MessageSquareText size={20} color={RED} strokeWidth={1.6} />, step: '01 · Ask', title: 'Say it in your own words', body: 'Describe what you’re building. No legal vocabulary required.' },
+              { icon: <BookOpen size={20} color={RED} strokeWidth={1.6} />, step: '02 · Understand', title: 'Get a straight answer', body: 'Plain explanations, honest about limits. No fake confidence.' },
+              { icon: <FileText size={20} color={RED} strokeWidth={1.6} />, step: '03 · Receive', title: 'Walk out with documents', body: 'Eleven core documents in your words. Yours to edit in Word and PDF.' },
+            ] as const).map(({ icon, step, title, body }) => (
+              <GlassCard key={step} style={{ flex: '1 1 240px', minWidth: 230, padding: '24px 22px', display: 'flex', flexDirection: 'column', gap: 11 }}>
+                <span style={{ width: 40, height: 40, borderRadius: 11, background: 'rgba(242,234,224,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{icon}</span>
+                <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '0.16em', textTransform: 'uppercase', color: FAINT }}>{step}</div>
+                <h3 style={{ margin: 0, fontFamily: BRICOLAGE, fontWeight: 600, fontSize: 18, lineHeight: 1.2, color: INK }}>{title}</h3>
+                <p style={{ margin: 0, fontSize: 15.5, lineHeight: 1.55, color: MUTED }}>{body}</p>
+              </GlassCard>
+            ))}
+          </div>
+
+          {/* Auto-scrolling document showcase */}
+          <div style={{ width: '100%', maxWidth: 920, display: 'flex', flexDirection: 'column', gap: 18 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', justifyContent: 'space-between', gap: '10px 24px', padding: '0 4px' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9, fontFamily: MONO, fontSize: 11, letterSpacing: '0.22em', textTransform: 'uppercase', color: FAINT }}>
+                <ArchPip /> What we draft
+              </span>
+              <h2 style={{ margin: 0, fontFamily: BRICOLAGE, fontWeight: 500, fontSize: 'clamp(22px,2.8vw,32px)', lineHeight: 1.04, letterSpacing: '-0.02em', color: INK }}>
+                Eleven documents. Built for real founders.
+              </h2>
+            </div>
+
+            <DocumentMarquee items={allDocuments} />
+
+            <p style={{ margin: 0, fontSize: 15.5, lineHeight: 1.6, color: MUTED, maxWidth: '62ch', padding: '0 4px' }}>
+              Covers product, consulting, and nonprofit structures. Anything beyond these, we hand off to a real lawyer rather than guess.
+            </p>
+          </div>
+
+          {/* CTA */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, textAlign: 'center' }}>
+            <CtaButton onClick={() => setAct('chat')} lg>
+              Start with a question <ArrowRight size={18} strokeWidth={1.8} />
+            </CtaButton>
+            <span style={{ display: 'flex', alignItems: 'flex-start', gap: 7, maxWidth: '42ch' }}>
+              <ShieldCheck size={13} color={MUTED} strokeWidth={1.6} style={{ marginTop: 3, flexShrink: 0 }} aria-hidden />
+              <span style={{ fontFamily: MONO, fontSize: 11, lineHeight: 1.7, color: MUTED, textAlign: 'left' }}>
+                Educational, not legal advice. We point you to a real lawyer when it matters.
+              </span>
+            </span>
+          </div>
+
+          {/* Footnote */}
+          <p style={{ margin: 0, maxWidth: '76ch', fontFamily: MONO, fontSize: 11, lineHeight: 1.75, color: MUTED, textAlign: 'center', borderTop: '1px solid rgba(42,36,32,0.10)', paddingTop: 'clamp(22px,3vh,30px)' }}>
+            FounderLex provides legal information and document templates for educational purposes only. It is not a law firm and does not provide legal advice. Using it does not create an attorney-client relationship. For advice about your specific situation, consult a licensed attorney.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </section>
+
+      {/* ══════════════════════════════════════════════════════════════════
+          ACT 3 — CHAT
+      ══════════════════════════════════════════════════════════════════ */}
+      <section style={{
+        ...scene('chat', act === 'chat' ? 40 : 5),
+        background: CREAM, display: 'flex', flexDirection: 'column', alignItems: 'center',
+      }}>
+        <div style={{ width: '100%', maxWidth: 760, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, padding: '0 clamp(14px,3vw,22px)' }}>
+
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 4px', borderBottom: '1px solid rgba(42,36,32,0.10)', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+              <DoorGlyph w={16} h={18} panelTop={6} outerR={8} innerR={3} />
+              <span style={{ fontFamily: BRICOLAGE, fontWeight: 700, fontSize: 15, color: INK }}>
+                Founder<span style={{ color: RED }}>Lex</span>
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: MONO, fontSize: 10, letterSpacing: '0.10em', textTransform: 'uppercase', color: FAINT }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3F9D6A', flexShrink: 0 }} />
+                Here with you
+              </span>
+              <BackChatLink onClick={() => setAct('about')} />
+            </div>
+          </div>
+
+          {/* Conversation */}
+          <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '26px 4px 16px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+
+            {/* Greeting */}
+            <div style={{ display: 'flex', gap: 11, alignItems: 'flex-start', maxWidth: '90%' }}>
+              <DoorGlyph w={28} h={31} panelTop={10} outerR={14} innerR={6} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ background: TILE, color: INK, padding: '15px 18px', borderRadius: '4px 16px 16px 16px', fontFamily: NEWSREADER, fontSize: 17, lineHeight: 1.55 }}>
+                  Hi, I'm FounderLex. Tell me what you're building and I'll walk you through the legal basics in plain English. <span style={{ color: MUTED }}>No legal knowledge needed.</span>
+                </div>
+                {messages.length === 0 && !isLoading && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {["Splitting equity with a co-founder", "Hiring my first contractor", "Do I need an NDA?", "Starting a nonprofit"].map(chip => (
+                      <Chip key={chip} label={chip} onSelect={sendMessage} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Message history */}
+            {messages.map((m, i) => {
+              if (m.role === 'doc-card' && m.template) {
+                return (
+                  <div key={i} style={{ display: 'flex', paddingLeft: 39 }}>
+                    <DocCard
+                      template={m.template}
+                      onGenerate={() => handleGenerate(m.template!)}
+                      generating={generatingTpl === m.template}
+                    />
+                  </div>
+                )
+              }
+              if (m.isLoading) return <LoadingBubble key={i} />
+              return (
+                <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                  {m.role === 'bot' && <div style={{ marginRight: 11, flexShrink: 0, paddingTop: 4 }}><DoorGlyph w={20} h={22} panelTop={7} outerR={10} innerR={4} /></div>}
+                  <div style={{
+                    maxWidth: '82%',
+                    background: m.role === 'user' ? INK : TILE,
+                    color: m.role === 'user' ? CREAM : INK,
+                    padding: '14px 17px',
+                    borderRadius: m.role === 'user' ? '16px 16px 4px 16px' : '4px 16px 16px 16px',
+                    fontFamily: NEWSREADER, fontSize: 16.5, lineHeight: 1.55,
+                    whiteSpace: 'pre-wrap',
+                  }}>
+                    {m.text}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Input bar */}
+          <div style={{ padding: '8px 4px 20px', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: WHITE, border: '1px solid rgba(42,36,32,0.14)', borderRadius: 15, padding: '8px 8px 8px 17px', boxShadow: '0 14px 30px -22px rgba(42,36,32,0.5)' }}>
+              <input
+                value={draft}
+                onChange={e => setDraft(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(draft) } }}
+                aria-label="Ask FounderLex a question"
+                placeholder="Ask anything about starting your business…"
+                disabled={isLoading}
+                style={{ flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', fontFamily: NEWSREADER, fontSize: 16, color: INK }}
+              />
+              <SendButton onClick={() => sendMessage(draft)} disabled={isLoading || !draft.trim()} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7, marginTop: 10, paddingLeft: 4 }}>
+              <ShieldCheck size={12} color={FAINT} strokeWidth={1.6} style={{ marginTop: 2, flexShrink: 0 }} aria-hidden />
+              <span style={{ fontFamily: MONO, fontSize: 10.5, lineHeight: 1.6, color: FAINT }}>
+                Educational, not legal advice. I'll point you to a real lawyer when it matters.
+              </span>
+            </div>
+          </div>
         </div>
-      </main>
+      </section>
     </div>
-  );
+  )
 }
+

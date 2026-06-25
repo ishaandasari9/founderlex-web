@@ -1,26 +1,342 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+*, *::before, *::after { box-sizing: border-box; }
+
+::selection {
+  background: #DB1A1A;
+  color: #F7F2EB;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+button { cursor: pointer; }
+input { font-family: inherit; }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* ─── BorderGlow Component ────────────────────────────────── */
+.border-glow-card {
+  position: relative;
+  border-radius: var(--border-radius, 28px);
+  background: var(--card-bg, #F7F2EB);
+  isolation: isolate;
+}
+
+/* Blurred glow halo — sits behind the card via negative z-index */
+.border-glow-card::before {
+  content: '';
+  position: absolute;
+  inset: calc(var(--glow-padding, 40px) * -0.4);
+  border-radius: calc(var(--border-radius, 28px) + var(--glow-padding, 40px) * 0.4);
+  background: conic-gradient(
+    from calc(var(--cursor-angle, 110deg) - calc(var(--cone-spread, 22) * 1deg)),
+    transparent 0deg,
+    var(--glow-color-10, hsl(35deg 85% 75% / 10%)) 15deg,
+    var(--glow-color-40, hsl(35deg 85% 75% / 40%)) 35deg,
+    var(--glow-color, hsl(35deg 85% 75% / 100%)) 50deg,
+    var(--glow-color-40, hsl(35deg 85% 75% / 40%)) 65deg,
+    var(--glow-color-10, hsl(35deg 85% 75% / 10%)) 85deg,
+    transparent 100deg,
+    transparent 360deg
+  );
+  filter: blur(18px);
+  opacity: 0;
+  transition: opacity 600ms ease;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* Thin conic border ring */
+.border-glow-card::after {
+  content: '';
+  position: absolute;
+  inset: -1.5px;
+  border-radius: calc(var(--border-radius, 28px) + 1.5px);
+  background: conic-gradient(
+    from calc(var(--cursor-angle, 110deg) - calc(var(--cone-spread, 22) * 1deg)),
+    transparent 0deg,
+    var(--glow-color-20, hsl(35deg 85% 75% / 20%)) 10deg,
+    var(--glow-color, hsl(35deg 85% 75% / 100%)) 50deg,
+    var(--glow-color-20, hsl(35deg 85% 75% / 20%)) 90deg,
+    transparent 110deg,
+    transparent 360deg
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  padding: 1.5px;
+  opacity: 0;
+  transition: opacity 600ms ease;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* Hover activation (when not looping) */
+.border-glow-card:not(.loop-active):hover::before,
+.border-glow-card.sweep-active:not(.loop-active)::before {
+  opacity: calc(var(--edge-proximity, 0) / 100 * 0.9);
+}
+.border-glow-card:not(.loop-active):hover::after,
+.border-glow-card.sweep-active:not(.loop-active)::after {
+  opacity: calc(var(--edge-proximity, 0) / 100);
+}
+
+/* Sweep animation: faster transition */
+.border-glow-card.sweep-active::before,
+.border-glow-card.sweep-active::after {
+  transition: opacity 200ms ease;
+}
+
+/* Loop mode: always visible, no transitions */
+.border-glow-card.loop-active::before {
+  opacity: 0.8 !important;
+  transition: none !important;
+}
+.border-glow-card.loop-active::after {
+  opacity: 1 !important;
+  transition: none !important;
+}
+
+/* Edge-light span: simplified as border highlight */
+.border-glow-card > .edge-light {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px var(--glow-color-20, transparent);
+  opacity: 0;
+  transition: opacity 600ms ease;
+  z-index: 2;
+  pointer-events: none;
+}
+.border-glow-card:not(.loop-active):hover > .edge-light {
+  opacity: calc(var(--edge-proximity, 0) / 100 * 0.6);
+}
+.border-glow-card.loop-active > .edge-light {
+  opacity: 0.4 !important;
+  transition: none !important;
+}
+
+/* Content layer */
+.border-glow-inner {
+  position: relative;
+  z-index: 1;
+  border-radius: inherit;
+  overflow: hidden;
+  height: 100%;
+}
+
+/* ─── Loading dots animation ──────────────────────────────── */
+@keyframes blink {
+  0%, 80%, 100% { opacity: 0.25; transform: scale(0.9); }
+  40% { opacity: 1; transform: scale(1.1); }
+}
+
+.loading-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #9B8F82;
+  animation: blink 1.2s infinite ease-in-out;
+}
+.loading-dot:nth-child(1) { animation-delay: 0ms; }
+.loading-dot:nth-child(2) { animation-delay: 200ms; }
+.loading-dot:nth-child(3) { animation-delay: 400ms; }
+
+/* ─── Door hero (3D loader + safe areas) ──────────────────── */
+.door-hero-loader-glyph {
+  animation: door-loader-breathe 2.4s ease-in-out infinite;
+}
+
+@keyframes door-loader-breathe {
+  0%, 100% { transform: translateY(0) scale(1); opacity: 0.92; }
+  50% { transform: translateY(-4px) scale(1.03); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .door-hero-loader-glyph {
+    animation: none;
+  }
+}
+
+.door-hero-canvas {
+  position: relative;
+}
+
+.door-hero-canvas::before {
+  content: '';
+  position: absolute;
+  inset: -12%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 88%, rgba(251, 239, 215, 0.75) 0%, rgba(240, 220, 188, 0.35) 42%, transparent 72%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.door-hero-canvas canvas {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.door-hero-canvas--immersive {
+  background: #F7F2EB;
+}
+
+/* ─── Glass cards (about page) ────────────────────────────── */
+.glass-card {
+  position: relative;
+  border-radius: 18px;
+  background: rgba(255, 253, 248, 0.52);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  box-shadow:
+    0 24px 48px -28px rgba(42, 36, 32, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(18px) saturate(1.35);
+  -webkit-backdrop-filter: blur(18px) saturate(1.35);
+  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+  overflow: hidden;
+}
+
+.glass-card:hover {
+  border-color: rgba(255, 255, 255, 0.92);
+  box-shadow:
+    0 28px 56px -24px rgba(42, 36, 32, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+.glass-card__shine {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.55) 0%, transparent 42%, transparent 58%, rgba(255,255,255,0.2) 100%);
+  opacity: 0.65;
+}
+
+.about-hero-glass {
+  border-radius: 24px;
+}
+
+/* ─── Document auto-scroll marquee ────────────────────────── */
+.doc-marquee {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 18px;
+  padding: 6px 0;
+  background: rgba(255, 253, 248, 0.35);
+  border: 1px solid rgba(42, 36, 32, 0.08);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.doc-marquee-track {
+  display: flex;
+  gap: 12px;
+  width: max-content;
+  padding: 10px 12px;
+  animation: doc-marquee-scroll 48s linear infinite;
+}
+
+.doc-marquee-card {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 240px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(42, 36, 32, 0.1);
+  box-shadow: 0 12px 28px -18px rgba(42, 36, 32, 0.35);
+}
+
+.doc-marquee-card__icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.doc-marquee-card__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.doc-marquee-card__category {
+  font-family: var(--font-mono), monospace;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #9B8F82;
+}
+
+.doc-marquee-card__label {
+  font-family: var(--font-bricolage), sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  color: #2A2420;
+  white-space: nowrap;
+}
+
+.doc-marquee-card__badge {
+  margin-left: auto;
+  font-family: var(--font-mono), monospace;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #B9AC9C;
+  white-space: nowrap;
+}
+
+.doc-marquee-fade {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 48px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.doc-marquee-fade--left {
+  left: 0;
+  background: linear-gradient(90deg, #FBF3E4 0%, transparent 100%);
+}
+
+.doc-marquee-fade--right {
+  right: 0;
+  background: linear-gradient(270deg, #FBF3E4 0%, transparent 100%);
+}
+
+@keyframes doc-marquee-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .doc-marquee-track {
+    animation: none;
+    flex-wrap: wrap;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .glass-card {
+    transition: none;
+  }
+
+  /* Keep door swing visible even with reduce-motion OS setting */
+  .door-leaf {
+    transition: transform 760ms cubic-bezier(.62, 0, .30, 1), box-shadow 760ms ease !important;
+  }
 }

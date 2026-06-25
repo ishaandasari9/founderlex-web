@@ -1,7 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  outputFileTracingIncludes: {
+    '/api/generate': ['./lib/templates/**'],
+  },
+  serverExternalPackages: ['pdfkit', 'html-to-docx'],
 };
 
 export default nextConfig;
