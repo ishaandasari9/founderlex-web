@@ -82,13 +82,13 @@ const TEMPLATE_LABELS: Record<string, string> = {
 }
 
 const TEMPLATE_KEYWORDS: Record<string, string[]> = {
-  founders_agreement: ["founders' agreement", "founder agreement", "co-founder", "cofounder", "equity split", "vesting schedule", "founders agreement"],
+  founders_agreement: ["founders' agreement", "founder agreement", "equity split", "vesting schedule", "founders agreement"],
   contractor_agreement: ['contractor agreement', 'freelancer agreement', 'work for hire'],
-  mutual_nda: ['nda', 'non-disclosure', 'confidentiality agreement', 'mutual nda'],
-  terms_of_service: ['terms of service', 'terms and conditions', 'tos'],
+  mutual_nda: ['non-disclosure agreement', 'confidentiality agreement', 'mutual nda'],
+  terms_of_service: ['terms of service', 'terms and conditions'],
   privacy_policy: ['privacy policy'],
   consulting_agreement: ['consulting agreement'],
-  sow_template: ['statement of work', ' sow '],
+  sow_template: ['statement of work'],
   independent_contractor_consulting: ['independent contractor agreement'],
   nonprofit_articles: ['articles of incorporation', 'nonprofit articles'],
   nonprofit_bylaws: ['nonprofit bylaws', 'nonprofit by-laws'],

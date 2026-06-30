@@ -10,7 +10,7 @@ let cachedPrompt: string | null = null
 function getSystemPrompt(): string {
   if (cachedPrompt) return cachedPrompt
   try {
-    const path = join(process.cwd(), '..', 'skill', 'SKILL.md')
+    const path = join(process.cwd(), 'skill', 'SKILL.md')
     cachedPrompt = readFileSync(path, 'utf8')
     return cachedPrompt
   } catch {
