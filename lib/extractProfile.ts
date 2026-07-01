@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { ChatMessage } from './chat'
-import type { FounderProfile } from './founderProfile'
+import { emptyProfile, type FounderProfile } from './founderProfile'
 
 let _client: Anthropic | null = null
 function getClient() {
@@ -8,13 +8,17 @@ function getClient() {
   return _client
 }
 
-const SYSTEM_PROMPT = `You extract a structured FounderProfile from a conversation between a student founder and a legal-basics assistant.
+const SYSTEM_PROMPT = `You maintain a structured FounderProfile for a student founder talking to a legal-basics assistant. You are given the profile as known so far, plus the latest exchange. Update it — do not rebuild it from scratch.
 
 Rules:
-- Only fill in a field if the conversation explicitly supports it. If something was never discussed, leave it null (or an empty array/string). Never invent or guess values.
-- Normalize natural language into numbers. "The three of us split evenly" means three founders each at 33.3 equity_pct. "60/40 between me and my co-founder" means one founder at 60 and one at 40. Percentages across all founders should reflect what was actually said, not be forced to round numbers.
+- Preserve every existing field exactly as given unless the latest exchange adds new information or explicitly corrects something. Never drop a fact that was already established.
+- Only fill in or change a field if the latest exchange explicitly supports it. If something isn't mentioned, leave the existing value (or null/empty if it was never known). Never invent or guess values.
+- Normalize natural language into numbers. "The three of us split evenly" means three founders each at 33.3 equity_pct. "60/40 between me and my co-founder" means one founder at 60 and one at 40.
+- Record equity_pct exactly as stated, even if the numbers don't add up to 100 (e.g. three founders who each say "I get 50 percent" get recorded as 50/50/50). Do NOT silently correct, round, or renormalize a math error you notice — record it as-is. Catching bad math is a downstream validation step, not yours.
 - Each founder needs a name if one was given (use "Founder 1", "Founder 2", etc. only if the person is referred to but never named).
-- registered, handles_user_data, and has_ip are booleans only when explicitly stated; otherwise null.`
+- Capture company_name only if a specific company/product name was actually given (not a generic description); otherwise null.
+- registered, handles_user_data, and has_ip are booleans only when explicitly stated; otherwise null.
+- Always return the complete profile object, including all fields that carry over unchanged.`
 
 const FOUNDER_PROFILE_TOOL: Anthropic.Tool = {
   name: 'extract_founder_profile',
@@ -22,6 +26,7 @@ const FOUNDER_PROFILE_TOOL: Anthropic.Tool = {
   input_schema: {
     type: 'object',
     properties: {
+      company_name: { type: ['string', 'null'], description: 'The company/product name, only if explicitly given.' },
       product_description: { type: 'string', description: 'What the founders are building, in their own words. Empty string if not discussed.' },
       business_type: { type: ['string', 'null'], enum: ['product', 'consulting', 'nonprofit', null] },
       founders: {
@@ -47,6 +52,7 @@ const FOUNDER_PROFILE_TOOL: Anthropic.Tool = {
       confirmed_documents: { type: 'array', items: { type: 'string' } },
     },
     required: [
+      'company_name',
       'product_description',
       'business_type',
       'founders',
@@ -62,12 +68,34 @@ const FOUNDER_PROFILE_TOOL: Anthropic.Tool = {
   },
 }
 
-export async function extractProfile(messages: ChatMessage[]): Promise<FounderProfile> {
+export async function extractProfile(
+  messages: ChatMessage[],
+  existingProfile?: FounderProfile | null,
+): Promise<FounderProfile> {
+  const base = existingProfile ?? emptyProfile()
+
+  // Bound the extraction call to the latest exchange rather than resending the
+  // whole (ever-growing) transcript: the existing profile already carries
+  // everything from earlier turns, so only the newest facts need extracting.
+  const lastUserIndex = findLastIndex(messages, (m) => m.role === 'user')
+  const lastUserMessage = lastUserIndex >= 0 ? messages[lastUserIndex] : null
+  const priorAssistantMessage = lastUserIndex > 0
+    ? [...messages.slice(0, lastUserIndex)].reverse().find((m) => m.role === 'assistant')
+    : undefined
+
+  if (!lastUserMessage) return base
+
+  const system = [
+    SYSTEM_PROMPT,
+    `\nProfile known so far:\n${JSON.stringify(base)}`,
+    priorAssistantMessage ? `\nFor context, the assistant had just said: "${priorAssistantMessage.content}"` : '',
+  ].join('')
+
   const response = await getClient().messages.create({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 1024,
-    system: SYSTEM_PROMPT,
-    messages,
+    system,
+    messages: [{ role: 'user', content: lastUserMessage.content }],
     tools: [FOUNDER_PROFILE_TOOL],
     tool_choice: { type: 'tool', name: 'extract_founder_profile' },
   })
@@ -78,16 +106,24 @@ export async function extractProfile(messages: ChatMessage[]): Promise<FounderPr
   const input = (toolUse?.input ?? {}) as Partial<FounderProfile>
 
   return {
-    product_description: input.product_description ?? '',
-    business_type: input.business_type ?? null,
-    founders: input.founders ?? [],
-    registered: input.registered ?? null,
-    structure: input.structure ?? null,
-    state: input.state ?? null,
-    handles_user_data: input.handles_user_data ?? null,
-    has_ip: input.has_ip ?? null,
-    taking_money_from: input.taking_money_from ?? null,
-    recommended_documents: input.recommended_documents ?? [],
-    confirmed_documents: input.confirmed_documents ?? [],
+    company_name: input.company_name ?? base.company_name,
+    product_description: input.product_description ?? base.product_description,
+    business_type: input.business_type ?? base.business_type,
+    founders: input.founders ?? base.founders,
+    registered: input.registered ?? base.registered,
+    structure: input.structure ?? base.structure,
+    state: input.state ?? base.state,
+    handles_user_data: input.handles_user_data ?? base.handles_user_data,
+    has_ip: input.has_ip ?? base.has_ip,
+    taking_money_from: input.taking_money_from ?? base.taking_money_from,
+    recommended_documents: input.recommended_documents ?? base.recommended_documents,
+    confirmed_documents: input.confirmed_documents ?? base.confirmed_documents,
   }
+}
+
+function findLastIndex<T>(arr: T[], predicate: (item: T) => boolean): number {
+  for (let i = arr.length - 1; i >= 0; i--) {
+    if (predicate(arr[i])) return i
+  }
+  return -1
 }

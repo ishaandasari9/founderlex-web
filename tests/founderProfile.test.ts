@@ -1,19 +1,7 @@
-import { validateProfile, type FounderProfile } from '../lib/founderProfile'
+import { validateProfile, emptyProfile, type FounderProfile } from '../lib/founderProfile'
 
 function baseProfile(founders: FounderProfile['founders']): FounderProfile {
-  return {
-    product_description: '',
-    business_type: null,
-    founders,
-    registered: null,
-    structure: null,
-    state: null,
-    handles_user_data: null,
-    has_ip: null,
-    taking_money_from: null,
-    recommended_documents: [],
-    confirmed_documents: [],
-  }
+  return { ...emptyProfile(), founders }
 }
 
 function founder(name: string, equity_pct: number) {

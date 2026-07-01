@@ -6,6 +6,7 @@ import {
   ArrowRight, ArrowLeft, ArrowUp,
   MessageSquareText, BookOpen, FileText, ShieldCheck, Download,
 } from 'lucide-react'
+import type { FounderProfile } from '@/lib/founderProfile'
 
 // ── React Bits — SSR disabled (motion/react needs window) ────────────────────
 // Cast to any to bypass TypeScript inference quirks from .jsx component files
@@ -341,6 +342,8 @@ export default function Home() {
   const [draft, setDraft]           = useState('')
   const [messages, setMessages]     = useState<Msg[]>([])
   const [isLoading, setIsLoading]   = useState(false)
+  const [profile, setProfile]       = useState<FounderProfile | null>(null)
+  const profileRef                  = useRef<FounderProfile | null>(null)
   const [docCount, setDocCount]     = useState(0)
   const [generatingTpl, setGeneratingTpl] = useState<string | null>(null)
   const [enterSignal, setEnterSignal]     = useState(0)
@@ -350,8 +353,9 @@ export default function Home() {
   const scrollRef    = useRef<HTMLDivElement>(null)
   const messagesRef  = useRef<Msg[]>([])
 
-  // Keep ref in sync with state
+  // Keep refs in sync with state
   useEffect(() => { messagesRef.current = messages }, [messages])
+  useEffect(() => { profileRef.current = profile }, [profile])
 
   // Auto-scroll on new messages
   useEffect(() => {
@@ -380,10 +384,11 @@ export default function Home() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: apiPayload }),
+        body: JSON.stringify({ messages: apiPayload, profile: profileRef.current }),
       })
       const data = await res.json()
       const reply: string = data.content || "I'm sorry, I couldn't process that. Could you rephrase?"
+      if (data.profile) setProfile(data.profile)
 
       setMessages(prev => {
         const next = prev.filter(m => !m.isLoading)
