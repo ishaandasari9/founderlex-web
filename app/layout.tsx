@@ -25,9 +25,9 @@ const jetbrainsMono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'FounderLex — Startup Legal Basics, in Plain English',
+  title: 'FounderLex: Startup Legal Basics, in Plain English',
   description:
-    'A guided assistant for first-time founders. Understand startup legal basics in plain English, figure out which documents you need, draft them with your details — and know when to talk to a real lawyer.',
+    'A guided assistant for first-time founders. Understand startup legal basics in plain English, figure out which documents you need, draft them with your details, and know when to talk to a real lawyer.',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

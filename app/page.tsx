@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect, useCallback, Suspense } from 'react
 import dynamic from 'next/dynamic'
 import {
   ArrowRight, ArrowLeft, ArrowUp,
-  MessageSquareText, BookOpen, FileText, ShieldCheck, Download,
+  MessageSquareText, BookOpen, FileText, ShieldCheck, Download, ShieldAlert, Lock,
 } from 'lucide-react'
 import { validateProfile, emptyProfile, type FounderProfile } from '@/lib/founderProfile'
 import type { ConfirmField } from '@/lib/confirmationFields'
@@ -629,7 +629,7 @@ export default function Home() {
                 FounderLex explains startup legal basics in plain English.
               </h1>
               <p style={{ margin: 0, fontFamily: NEWSREADER, fontSize: 'clamp(18px,1.7vw,21px)', lineHeight: 1.6, color: MUTED, maxWidth: '48ch' }}>
-                A guided assistant for first-time founders. Understand the basics, figure out which documents you need, and draft them with your details — with a path to a real lawyer when it&apos;s beyond the basics.
+                A guided assistant for first-time founders. Understand the basics, figure out which documents you need, and draft them with your details, with a path to a real lawyer when it&apos;s beyond the basics.
               </p>
             </div>
           </GlassCard>
@@ -650,7 +650,7 @@ export default function Home() {
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 14, width: '100%', maxWidth: 880 }}>
             {([
               { icon: <MessageSquareText size={20} color={RED} strokeWidth={1.6} />, step: '01 · Ask', title: 'Say it in your own words', body: 'Describe what you’re building. No legal vocabulary required.' },
-              { icon: <BookOpen size={20} color={RED} strokeWidth={1.6} />, step: '02 · Understand', title: 'Understand the basics', body: 'Plain explanations of what matters and why — honest about limits, and clear when it’s time for a lawyer.' },
+              { icon: <BookOpen size={20} color={RED} strokeWidth={1.6} />, step: '02 · Understand', title: 'Understand the basics', body: 'Plain explanations of what matters and why, honest about limits, and clear when it’s time for a lawyer.' },
               { icon: <FileText size={20} color={RED} strokeWidth={1.6} />, step: '03 · Draft', title: 'Draft with your details', body: 'Starter documents in your words, filled in with your specifics. Yours to review, edit, and take to a lawyer.' },
             ] as const).map(({ icon, step, title, body }) => (
               <GlassCard key={step} style={{ flex: '1 1 240px', minWidth: 230, padding: '24px 22px', display: 'flex', flexDirection: 'column', gap: 11 }}>
@@ -680,6 +680,68 @@ export default function Home() {
             </p>
           </div>
 
+          {/* Trust & transparency */}
+          <div className="about-trust" style={{ width: '100%', maxWidth: 920, display: 'flex', flexDirection: 'column', gap: 18 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', justifyContent: 'space-between', gap: '10px 24px', padding: '0 4px' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9, fontFamily: MONO, fontSize: 11, letterSpacing: '0.22em', textTransform: 'uppercase', color: FAINT }}>
+                <ArchPip /> Trust &amp; transparency
+              </span>
+              <h2 style={{ margin: 0, fontFamily: BRICOLAGE, fontWeight: 500, fontSize: 'clamp(22px,2.8vw,32px)', lineHeight: 1.04, letterSpacing: '-0.02em', color: INK }}>
+                Honest about what we are, and aren&apos;t.
+              </h2>
+            </div>
+
+            <div className="about-trust-grid">
+              <GlassCard className="about-trust-card" style={{ padding: '24px 22px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <span style={{ width: 40, height: 40, borderRadius: 11, background: 'rgba(242,234,224,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <ShieldAlert size={20} color={RED} strokeWidth={1.6} />
+                </span>
+                <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '0.16em', textTransform: 'uppercase', color: FAINT }}>Where we stop</div>
+                <h3 style={{ margin: 0, fontFamily: BRICOLAGE, fontWeight: 600, fontSize: 18, lineHeight: 1.2, color: INK }}>What FounderLex can&apos;t do</h3>
+                <p style={{ margin: 0, fontSize: 15.5, lineHeight: 1.55, color: MUTED }}>
+                  We explain startup legal basics and draft starter documents. We do not give legal advice, and we are not a law firm. When your situation needs a licensed professional, we say so plainly and point you to one.
+                </p>
+                <ul className="about-trust-list">
+                  <li>Active disputes: lawsuits, cease-and-desist letters, or threats of legal action</li>
+                  <li>Fundraising and securities questions</li>
+                  <li>Immigration and visa status</li>
+                  <li>Tax strategy and elections (e.g. S-Corp timing)</li>
+                  <li>Anything criminal or law-enforcement related</li>
+                </ul>
+              </GlassCard>
+
+              <GlassCard className="about-trust-card" style={{ padding: '24px 22px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <span style={{ width: 40, height: 40, borderRadius: 11, background: 'rgba(242,234,224,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <BookOpen size={20} color={RED} strokeWidth={1.6} />
+                </span>
+                <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '0.16em', textTransform: 'uppercase', color: FAINT }}>Grounded in real sources</div>
+                <h3 style={{ margin: 0, fontFamily: BRICOLAGE, fontWeight: 600, fontSize: 18, lineHeight: 1.2, color: INK }}>Built from primary references</h3>
+                <p style={{ margin: 0, fontSize: 15.5, lineHeight: 1.55, color: MUTED }}>
+                  Our explanations draw on curated reference material, not invented rules. When we cite a source, it&apos;s one we actually use:
+                </p>
+                <ul className="about-trust-list about-trust-list--sources">
+                  <li><strong>IRS.gov</strong>: EIN, Form 1023, Form 990, 501(c)(3) basics</li>
+                  <li><strong>Internal Revenue Code § 501(c)(3)</strong>: nonprofit purpose requirements</li>
+                  <li><strong>USPTO.gov</strong>: trademark search and filing</li>
+                  <li><strong>copyright.gov</strong>: copyright registration</li>
+                  <li><strong>35 U.S.C. §§ 101-103</strong>: patentability standards</li>
+                  <li><strong>State Secretary of State offices</strong>: LLC and corporation formation</li>
+                </ul>
+              </GlassCard>
+
+              <GlassCard className="about-trust-card" style={{ padding: '24px 22px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <span style={{ width: 40, height: 40, borderRadius: 11, background: 'rgba(242,234,224,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Lock size={20} color={RED} strokeWidth={1.6} />
+                </span>
+                <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '0.16em', textTransform: 'uppercase', color: FAINT }}>Your conversation</div>
+                <h3 style={{ margin: 0, fontFamily: BRICOLAGE, fontWeight: 600, fontSize: 18, lineHeight: 1.2, color: INK }}>Saved privately, on your terms</h3>
+                <p style={{ margin: 0, fontSize: 15.5, lineHeight: 1.55, color: MUTED }}>
+                  No login required. Your session is saved anonymously on our server so you can pick up where you left off if you return on the same device. It&apos;s kept private, not shared or sold, and you can clear it anytime with <strong style={{ fontWeight: 600, color: INK }}>Clear conversation</strong> in the chat header.
+                </p>
+              </GlassCard>
+            </div>
+          </div>
+
           {/* CTA */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, textAlign: 'center' }}>
             <CtaButton onClick={() => setAct('chat')} lg>
@@ -688,7 +750,7 @@ export default function Home() {
             <span style={{ display: 'flex', alignItems: 'flex-start', gap: 7, maxWidth: '42ch' }}>
               <ShieldCheck size={13} color={MUTED} strokeWidth={1.6} style={{ marginTop: 3, flexShrink: 0 }} aria-hidden />
               <span style={{ fontFamily: MONO, fontSize: 11, lineHeight: 1.7, color: MUTED, textAlign: 'left' }}>
-                Educational, not legal advice — and not a law firm. We point you to a real lawyer when it matters.
+                Educational, not legal advice, and not a law firm. We point you to a real lawyer when it matters.
               </span>
             </span>
           </div>
@@ -743,7 +805,7 @@ export default function Home() {
               <DoorGlyph w={28} h={31} panelTop={10} outerR={14} innerR={6} />
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div style={{ background: TILE, color: INK, padding: '15px 18px', borderRadius: '4px 16px 16px 16px', fontFamily: NEWSREADER, fontSize: 17, lineHeight: 1.55 }}>
-                  Hi, I&apos;m FounderLex. Tell me what you&apos;re building — I&apos;ll explain the legal basics in plain English, help you figure out which documents you need, and draft them with your details. <span style={{ color: MUTED }}>No legal background needed.</span>
+                  Hi, I&apos;m FounderLex. Tell me what you&apos;re building. I&apos;ll explain the legal basics in plain English, help you figure out which documents you need, and draft them with your details. <span style={{ color: MUTED }}>No legal background needed.</span>
                 </div>
                 {messages.length === 0 && !isLoading && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -805,7 +867,7 @@ export default function Home() {
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7, marginTop: 10, paddingLeft: 4 }}>
               <ShieldCheck size={12} color={FAINT} strokeWidth={1.6} style={{ marginTop: 2, flexShrink: 0 }} aria-hidden />
               <span style={{ fontFamily: MONO, fontSize: 10.5, lineHeight: 1.6, color: FAINT }}>
-                Educational, not legal advice — and not a law firm. I&apos;ll point you to a real lawyer when it matters.
+                Educational, not legal advice, and not a law firm. I&apos;ll point you to a real lawyer when it matters. Your session is saved anonymously (no login) so you can return later. Use <strong style={{ fontWeight: 500, color: MUTED }}>Clear conversation</strong> anytime.
               </span>
             </div>
           </div>

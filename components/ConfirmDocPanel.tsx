@@ -184,7 +184,7 @@ export default function ConfirmDocPanel({
             onClick={generating ? undefined : onConfirm}
             disabled={generating}
           >
-            {generating ? 'Generating…' : 'Looks right — generate'}
+            {generating ? 'Generating…' : 'Looks right, generate'}
           </button>
         </div>
       </div>

@@ -188,6 +188,41 @@ input { font-family: inherit; }
   background: #F7F2EB;
 }
 
+/* ─── About trust signals ──────────────────────────────────── */
+.about-trust-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+  width: 100%;
+}
+
+.about-trust-card {
+  height: 100%;
+}
+
+.about-trust-list {
+  margin: 0;
+  padding: 0 0 0 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: #6F655B;
+}
+
+.about-trust-list li::marker {
+  color: #D4922A;
+}
+
+.about-trust-list--sources strong {
+  font-family: var(--font-bricolage), sans-serif;
+  font-weight: 600;
+  font-size: 13.5px;
+  color: #2A2420;
+}
+
 /* ─── Confirm document panel ───────────────────────────────── */
 .confirm-panel-backdrop {
   position: fixed;
