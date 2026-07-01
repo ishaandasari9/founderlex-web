@@ -384,6 +384,34 @@ export default function Home() {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [messages])
 
+  // Restore a saved session on first load
+  useEffect(() => {
+    fetch('/api/session')
+      .then(res => res.json())
+      .then((data: { messages?: Msg[]; profile?: FounderProfile | null }) => {
+        if (data.messages && data.messages.length > 0) setMessages(data.messages)
+        if (data.profile) setProfile(data.profile)
+      })
+      .catch(() => {})
+  }, [])
+
+  const persistSession = useCallback((msgs: Msg[], prof: FounderProfile | null) => {
+    fetch('/api/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: msgs, profile: prof }),
+    }).catch(() => {})
+  }, [])
+
+  const handleClearSession = useCallback(async () => {
+    try {
+      await fetch('/api/session', { method: 'DELETE' })
+    } catch {}
+    setMessages([])
+    setProfile(null)
+    setConfirmPanel(null)
+  }, [])
+
 
   // ── Send message ────────────────────────────────────────────────────────────
   const sendMessage = useCallback(async (text: string) => {
@@ -410,16 +438,17 @@ export default function Home() {
       })
       const data = await res.json()
       const reply: string = data.content || "I'm sorry, I couldn't process that. Could you rephrase?"
+      const updatedProfile: FounderProfile | null = data.profile ?? profileRef.current
       if (data.profile) setProfile(data.profile)
 
-      setMessages(prev => {
-        const next = prev.filter(m => !m.isLoading)
-        const botMsg: Msg = { role: 'bot', text: reply }
-        const result: Msg[] = [...next, botMsg]
-        const tpl = detectTemplate(reply)
-        if (tpl) result.push({ role: 'doc-card', text: '', template: tpl })
-        return result
-      })
+      const next = messagesRef.current.filter(m => !m.isLoading)
+      const botMsg: Msg = { role: 'bot', text: reply }
+      const result: Msg[] = [...next, botMsg]
+      const tpl = detectTemplate(reply)
+      if (tpl) result.push({ role: 'doc-card', text: '', template: tpl })
+
+      setMessages(result)
+      persistSession(result, updatedProfile)
     } catch {
       setMessages(prev => [
         ...prev.filter(m => !m.isLoading),
@@ -428,7 +457,7 @@ export default function Home() {
     } finally {
       setIsLoading(false)
     }
-  }, [isLoading])
+  }, [isLoading, persistSession])
 
   // ── Open the confirmation gate for a document (Human-in-the-loop Gate 2) ────
   const handleOpenConfirm = useCallback(async (template: string) => {
@@ -693,6 +722,15 @@ export default function Home() {
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3F9D6A', flexShrink: 0 }} />
                 Here with you
               </span>
+              {messages.length > 0 && (
+                <button onClick={handleClearSession}
+                  style={{
+                    fontFamily: MONO, fontSize: 10, letterSpacing: '0.10em', textTransform: 'uppercase',
+                    color: FAINT, background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                  }}>
+                  Clear conversation
+                </button>
+              )}
               <BackChatLink onClick={() => setAct('about')} />
             </div>
           </div>
