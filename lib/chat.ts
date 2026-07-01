@@ -39,11 +39,13 @@ export async function getChatResponse(
   founderName?: string,
   buildingDesc?: string,
   profileContext?: string,
+  referenceContext?: string,
 ): Promise<string> {
   const contextParts = [
     founderName ? `The founder's name is ${founderName} — use their name naturally once or twice.` : '',
     buildingDesc ? `They described what they're building as: "${buildingDesc}".` : '',
     profileContext || '',
+    referenceContext || '',
   ].filter(Boolean)
 
   const base = getSystemPrompt()
