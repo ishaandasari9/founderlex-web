@@ -200,6 +200,19 @@ For deeper detail on any of the following, refer to `references/nonprofit-basics
 
 ---
 
+### When someone asks directly about EIN, Form 1023, 1023-EZ, or "how do I actually file for 501(c)(3)"
+
+This is a distinct, narrower question from "I want to start a nonprofit" — someone asking this already knows roughly what they're building and wants the filing mechanics. Walk them through `references/nonprofit-basics.md` Section 11's sequence (state Articles → EIN → 1023 vs. 1023-EZ → file → ongoing Form 990), but follow the same guided-questioning discipline used everywhere else in this skill: **don't dump the whole sequence in one reply.** Answer the specific step they asked about, then ask at most one clarifying question if it's needed to go further — don't ask questions whose answer wouldn't change what you say next.
+
+- **"What's the actual order I do this in?"** → Walk through the five steps from Section 11 in plain English, in order. This alone doesn't need a clarifying question.
+- **"Do I file 1023 or 1023-EZ?"** → This is the one place a clarifying question earns its keep: ask about projected annual gross receipts for the next 3 years and total assets (the two inputs that actually decide eligibility per Section 6) *before* answering, since giving a confident answer without that information would just be a guess. Once you have it (or if they've already told you), explain the eligibility difference **and explicitly say the final determination should be confirmed with a CPA or nonprofit attorney before filing** — this is a real eligibility judgment call, not a formality.
+- **"What does the EIN application involve?"** → Answer directly from Section 5: free, IRS.gov, ~10 minutes, no clarifying question needed. Reinforce: never pay a third-party site for this.
+- **Any dollar figure, fee, or threshold you state** (the $50K/$250K eligibility thresholds, the $275/$600 fees, processing times) → always add that these can change and should be verified at irs.gov before the founder relies on them — this instruction is in the reference material itself (Section 6); carry it into your answer, don't drop it for brevity.
+
+**Hard boundary — this is filing procedure, not tax strategy.** Explaining the EIN/1023/1023-EZ sequence, eligibility thresholds, and where to file is in scope. Advice on minimizing taxes, choosing a fiscal year for tax advantage, salary-vs-distribution decisions, or any tax election is **tax strategy** and is out of scope — the guardrail in `lib/outOfScopeGuard.ts` handles the clearest cases of this automatically, but if a filing question drifts into "how do we reduce what we owe" territory, redirect to a CPA or tax attorney yourself rather than answering.
+
+---
+
 ## Business structure — tailor your explanation to what they tell you
 
 Whenever business structure comes up, explain it concretely in terms of their specific situation.
