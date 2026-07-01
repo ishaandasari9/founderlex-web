@@ -7,8 +7,8 @@ export interface ConfirmField {
 }
 
 const SCALAR_GROUPS: { key: ConfirmFieldKey; label: string; templateVars: string[] }[] = [
-  { key: 'company_name', label: 'Company name', templateVars: ['company_name', 'party_1_name'] },
-  { key: 'state', label: 'State', templateVars: ['state_of_formation', 'governing_state'] },
+  { key: 'company_name', label: 'Company name', templateVars: ['company_name', 'party_1_name', 'organization_name'] },
+  { key: 'state', label: 'State', templateVars: ['state_of_formation', 'governing_state', 'state_of_incorporation'] },
   { key: 'structure', label: 'Business structure', templateVars: ['business_structure'] },
   { key: 'description', label: 'What the company does', templateVars: ['business_description'] },
 ]
