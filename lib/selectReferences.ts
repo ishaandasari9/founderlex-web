@@ -34,7 +34,7 @@ const TOPIC_RULES: TopicRule[] = [
   },
   {
     file: 'nonprofit-basics.md',
-    keywords: ['501(c)(3)', '501c3', 'bylaws', 'board of directors', 'conflict of interest', 'form 1023', 'form 990'],
+    keywords: ['501(c)(3)', '501c3', 'bylaws', 'board of directors', 'conflict of interest', 'form 1023', 'form 990', 'donation acknowledgment', 'donation receipt', 'charitable contribution receipt'],
   },
 ]
 

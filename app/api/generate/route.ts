@@ -33,6 +33,10 @@ async function enforceRateLimit(req: Request): Promise<NextResponse | null> {
 const TEMPLATE_FILES: Record<string, string> = {
   founders_agreement:              'founders-agreement',
   mutual_nda:                      'nda-mutual',
+  unilateral_nda:                  'nda-unilateral',
+  advisor_agreement:               'advisor-agreement',
+  master_services_agreement:       'master-services-agreement',
+  donation_acknowledgment_letter:  'donation-acknowledgment-letter',
   contractor_agreement:            'independent-contractor',
   independent_contractor_consulting:'independent-contractor',
   terms_of_service:                'terms-of-service',

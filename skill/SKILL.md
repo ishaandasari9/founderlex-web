@@ -109,7 +109,11 @@ Always explain *why* each document matters, in one or two plain sentences, befor
 
 - **Sharing ideas, proposals, or confidential information with a client** → **Mutual NDA.** In consulting, both sides often share sensitive information before a deal is signed — a mutual NDA protects both parties. Use the `nda-mutual` template.
 
+- **Briefing a subcontractor or advisor who won't be sharing anything confidential back** → **Unilateral (one-way) NDA.** Use this instead of the Mutual NDA when only the consultant's side has anything sensitive to protect — for example, giving a subcontractor access to client materials to complete a task. Use the `nda-unilateral` template.
+
 - **Starting an actual client engagement** → **Statement of Work (SOW).** This is the most important consulting document. It locks in scope (what you're doing), deliverables (what you hand over), timeline, number of resources, rates, and who owns the IP. Coming in Chunk 4 — flag it now so they know it's coming.
+
+- **An ongoing or repeat client relationship, expecting multiple projects over time** → **Master Services Agreement (MSA)**, paired with a separate SOW per project. Only bring this up when the founder describes an ongoing relationship with a client (not a single one-off project) — for a single project, a SOW alone is enough. Explain the split plainly: the MSA sets the general terms once (payment framework, IP, liability, confidentiality), and each new project just needs a short SOW referencing it, instead of renegotiating everything from scratch every time. Use the `master-services-agreement` template alongside `sow_template`.
 
 - **Buying something from a vendor or supplier** → **Purchase Order (PO).** A simple document that locks in what's being bought, at what price, and when. Coming in Chunk 5.
 
@@ -125,11 +129,15 @@ Always explain *why* each document matters, in one or two plain sentences, befor
 
 - **Co-founders** → **Founders' Agreement.** Only bring this up when the founder has actually told you there's more than one founder or an equity split to document — never proactively ask about co-founders or mention a Founders' Agreement when the topic is something else (data, privacy, contracts, terms of service). When it IS relevant, flag it *strongly* as the most important early document. Without it, a co-founder who leaves can keep all their equity. Use the `founders-agreement` template.
 
+- **Bringing on an advisor in exchange for a small equity grant** → **Advisor Agreement.** Only bring this up when the founder mentions an advisor specifically (not a co-founder, contractor, or employee) — someone giving periodic strategic guidance in exchange for a small equity stake, not doing hands-on work. Flag clearly that issuing any equity — even to an advisor — involves securities law and should be confirmed with a startup attorney before it's actually issued, and that the 83(b) election deadline (30 days) applies here too if it's restricted stock. Use the `advisor-agreement` template. This does not apply to nonprofits — nonprofits have no shareholders and cannot issue equity to anyone, including advisors.
+
 - **Handling user data, accounts, or payments** → **Privacy Policy** + **Terms of Service.** These protect the company and tell users what the rules are. Use the `privacy-policy` and `terms-of-service` templates.
 
 - **Hiring anyone to build, design, or create** → **Independent Contractor Agreement** with IP-assignment clause. Only bring this up when the founder has actually told you they're hiring or working with a contractor/freelancer — don't proactively add it onto a recommendation for an unrelated request (e.g., Terms of Service, Privacy Policy) just because the product involves building software. When it IS relevant, the IP clause is critical: without it, the contractor owns the code/designs they built for you.
 
 - **Sharing confidential information with anyone (including before a pitch)** → **Mutual NDA.** Use the `nda-mutual` template. Important: if someone says they want to share their idea with an investor "before they sign anything," this is an NDA scenario, not a securities scenario. Do not pivot to the securities disclaimer unless they say they are actually taking money or signing investment terms. The right clarifying question here is: "Will you be sharing the technical details of how it works, or just the concept at a high level?" — sharing technical details means they need a Mutual NDA before any conversation.
+
+- **Briefing a contractor, advisor, or candidate who has nothing confidential to share back** → **Unilateral (one-way) NDA.** Use this instead of the Mutual NDA whenever only the founder's side is disclosing anything sensitive — for example, walking a potential advisor or new hire through the product before they're onboarded. Use the `nda-unilateral` template.
 
 - **A brand name or logo** → Trademark is usually the first IP priority for a product founder. Explain the ™ vs. ® distinction. Walk them through the two-step: (1) search USPTO TESS at USPTO.gov/trademarks/search before committing to the name — a conflict found after you've built everything is painful and expensive; (2) file via TEAS Plus (~$250/class) at USPTO.gov/trademarks/apply if the name is clear. Nationwide protection, not just local. Reference `references/ip-basics.md` Section 1 for the full filing walkthrough.
 
@@ -182,8 +190,11 @@ For deeper detail on any of the following, refer to `references/nonprofit-basics
 - Board composition, the three fiduciary duties, and why independent directors matter to the IRS (Section 7)
 - Ongoing compliance: Form 990 filing thresholds and deadlines, state charitable solicitation registration, meeting minutes (Section 8)
 - Common mistakes — especially the three-year 990 auto-revocation rule (Section 9)
+- Donation acknowledgment letter requirements — the $250 threshold and required elements (Section 10)
 
 **Step 4 — Ask one more question before recommending documents:** "Are you planning to fundraise from the public — through a website, events, or social media?" If yes, add state charitable solicitation registration to their action list: most states require registration *before* any public fundraising begins, even before a website donation button goes live. Point to `references/nonprofit-basics.md` Section 8 for state-by-state guidance.
+
+**Once the organization is actually receiving donations** → **Donation Acknowledgment Letter.** Only bring this up when the founder mentions they're receiving or about to receive actual donations — not during initial formation. Explain the key rule plainly: any single donation of $250 or more legally requires this written acknowledgment for the donor to claim a deduction, though most nonprofits send one for every gift. Flag that the "no goods or services provided" statement (or the alternative disclosure if something was given in return, like a gala dinner) is the part that most needs to be right. Use the `donation-acknowledgment-letter` template.
 
 **Step 5 — Recommend:** starter Articles of Incorporation + Bylaws + Conflict of Interest Policy (use templates in `templates/`), plus the professional referrals above.
 

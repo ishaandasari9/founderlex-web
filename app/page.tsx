@@ -74,29 +74,37 @@ const MONO       = 'var(--font-mono), monospace'
 const TEMPLATE_LABELS: Record<string, string> = {
   founders_agreement: "Founders' Agreement",
   contractor_agreement: 'Contractor Agreement',
+  unilateral_nda: 'Unilateral NDA',
   mutual_nda: 'Mutual NDA',
+  advisor_agreement: 'Advisor Agreement',
   terms_of_service: 'Terms of Service',
   privacy_policy: 'Privacy Policy',
   consulting_agreement: 'Consulting Agreement',
+  master_services_agreement: 'Master Services Agreement',
   sow_template: 'Statement of Work',
   independent_contractor_consulting: 'Independent Contractor Agreement',
   nonprofit_articles: 'Articles of Incorporation',
   nonprofit_bylaws: 'Nonprofit Bylaws',
   nonprofit_conflict_of_interest: 'Conflict of Interest Policy',
+  donation_acknowledgment_letter: 'Donation Acknowledgment Letter',
 }
 
 const TEMPLATE_KEYWORDS: Record<string, string[]> = {
+  advisor_agreement: ['advisor agreement', 'advisory agreement'],
   founders_agreement: ["founders' agreement", "founder agreement", "equity split", "vesting schedule", "founders agreement"],
   contractor_agreement: ['contractor agreement', 'freelancer agreement', 'work for hire'],
+  unilateral_nda: ['unilateral nda', 'one-way nda', 'unilateral non-disclosure', 'one-way non-disclosure'],
   mutual_nda: ['non-disclosure agreement', 'confidentiality agreement', 'mutual nda'],
   terms_of_service: ['terms of service', 'terms and conditions'],
   privacy_policy: ['privacy policy'],
   consulting_agreement: ['consulting agreement'],
+  master_services_agreement: ['master services agreement', 'master service agreement'],
   sow_template: ['statement of work'],
   independent_contractor_consulting: ['independent contractor agreement'],
   nonprofit_articles: ['articles of incorporation', 'nonprofit articles'],
   nonprofit_bylaws: ['nonprofit bylaws', 'nonprofit by-laws'],
   nonprofit_conflict_of_interest: ['conflict of interest policy'],
+  donation_acknowledgment_letter: ['donation acknowledgment letter', 'donation acknowledgement letter', 'donation receipt letter'],
 }
 
 function detectTemplate(text: string): string | null {
@@ -562,19 +570,19 @@ export default function Home() {
       : 'opacity .5s ease',
   })
 
-  // All 11 templates organized by category
+  // All 15 templates organized by category
   const templateCategories = [
     {
       label: 'Product', color: '#3A6EA8',
-      items: ['founders_agreement', 'contractor_agreement', 'mutual_nda', 'terms_of_service', 'privacy_policy'],
+      items: ['founders_agreement', 'contractor_agreement', 'mutual_nda', 'unilateral_nda', 'advisor_agreement', 'terms_of_service', 'privacy_policy'],
     },
     {
       label: 'Consulting', color: '#5A8A5A',
-      items: ['consulting_agreement', 'sow_template', 'independent_contractor_consulting'],
+      items: ['consulting_agreement', 'master_services_agreement', 'sow_template', 'independent_contractor_consulting'],
     },
     {
       label: 'Nonprofit', color: '#8A5A3A',
-      items: ['nonprofit_articles', 'nonprofit_bylaws', 'nonprofit_conflict_of_interest'],
+      items: ['nonprofit_articles', 'nonprofit_bylaws', 'nonprofit_conflict_of_interest', 'donation_acknowledgment_letter'],
     },
   ]
 
@@ -703,7 +711,7 @@ export default function Home() {
                 <ArchPip /> What we draft
               </span>
               <h2 style={{ margin: 0, fontFamily: BRICOLAGE, fontWeight: 500, fontSize: 'clamp(22px,2.8vw,32px)', lineHeight: 1.04, letterSpacing: '-0.02em', color: INK }}>
-                Eleven starter documents. Built for real founders.
+                Fifteen starter documents. Built for real founders.
               </h2>
             </div>
 

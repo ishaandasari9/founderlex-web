@@ -76,3 +76,17 @@ Independent directors (board members with no financial stake or employment relat
 - Soliciting donations publicly before completing state charitable-solicitation registration.
 - Treating the state-level nonprofit corporation filing as equivalent to having 501(c)(3) status — they are two separate steps.
 - Omitting or mis-wording the required IRS purpose/dissolution clauses in the Articles (see Section 2).
+
+## Section 10 — Donation Acknowledgment Letters (Written Substantiation Requirements)
+
+When a nonprofit receives a donation, the donor's ability to claim a tax deduction depends on the nonprofit giving them the right paperwork — this is a rule about what the *donor* needs, not something the nonprofit files with the IRS itself.
+
+- **The $250 threshold (IRC § 170(f)(8)):** For any single contribution of **$250 or more**, the donor cannot claim a tax deduction unless the nonprofit gives them a **contemporaneous written acknowledgment**. "Contemporaneous" means the donor must have it in hand by the earlier of: the date they file their tax return, or the due date (including extensions) for that return.
+- **Required elements of the acknowledgment** (per IRS Publication 1771):
+  1. The organization's name.
+  2. The amount of a cash contribution, **or** a description (not a dollar value) of a non-cash contribution.
+  3. A statement that no goods or services were provided by the organization in return for the contribution — **if that was the case**.
+  4. If the organization *did* provide something back (a dinner, a gift, event tickets), a description and good-faith estimate of its value, and a statement that the deduction is limited to the amount given minus that value. This "quid pro quo" disclosure is separately required under IRC § 6115 whenever a single payment over $75 is partly a donation and partly payment for goods or services.
+  5. If the only benefit provided was an intangible religious benefit, a statement saying so (no value estimate needed in that case).
+- **Best practice vs. legal requirement:** The $250 threshold is the legal trigger, but most nonprofits send an acknowledgment letter for every donation regardless of size — it's good donor relations and avoids tracking which donations cross the line.
+- **What NOT to include:** The nonprofit does not need to record or report the donor's Social Security number or other tax ID on the acknowledgment.

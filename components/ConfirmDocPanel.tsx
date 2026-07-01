@@ -9,7 +9,10 @@ const MUTED = '#6F655B'
 const TEMPLATE_LABELS: Record<string, string> = {
   founders_agreement: "Founders' Agreement",
   contractor_agreement: 'Contractor Agreement',
+  unilateral_nda: 'Unilateral NDA',
   mutual_nda: 'Mutual NDA',
+  advisor_agreement: 'Advisor Agreement',
+  master_services_agreement: 'Master Services Agreement',
   terms_of_service: 'Terms of Service',
   privacy_policy: 'Privacy Policy',
   consulting_agreement: 'Consulting Agreement',
@@ -18,6 +21,7 @@ const TEMPLATE_LABELS: Record<string, string> = {
   nonprofit_articles: 'Articles of Incorporation',
   nonprofit_bylaws: 'Nonprofit Bylaws',
   nonprofit_conflict_of_interest: 'Conflict of Interest Policy',
+  donation_acknowledgment_letter: 'Donation Acknowledgment Letter',
 }
 
 export interface ConfirmPanelState {
