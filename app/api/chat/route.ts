@@ -5,6 +5,10 @@ import { getChatResponse } from '@/lib/chat'
 import { extractProfile } from '@/lib/extractProfile'
 import { validateProfile, describeProfile, type FounderProfile } from '@/lib/founderProfile'
 import { selectReferenceFiles } from '@/lib/selectReferences'
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit'
+
+const CHAT_RATE_LIMIT = 20
+const CHAT_RATE_WINDOW_SECONDS = 60
 
 const referenceCache = new Map<string, string>()
 
@@ -24,6 +28,15 @@ function buildReferenceContext(files: string[]): string {
 
 export async function POST(req: Request) {
   try {
+    const ip = getClientIp(req)
+    const allowed = await checkRateLimit(`chat:${ip}`, CHAT_RATE_LIMIT, CHAT_RATE_WINDOW_SECONDS)
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "You're sending messages a little too quickly. Please wait a moment and try again." },
+        { status: 429 },
+      )
+    }
+
     const { messages, founderName, buildingDesc, profile } = await req.json() as {
       messages: Parameters<typeof getChatResponse>[0]
       founderName?: string

@@ -14,6 +14,20 @@ import { renderTemplate } from '@/lib/renderTemplate'
 import { buildTemplateVars } from '@/lib/profileToTemplateVars'
 import { emptyProfile, type FounderProfile } from '@/lib/founderProfile'
 import { getRelevantFields } from '@/lib/confirmationFields'
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit'
+
+const GENERATE_RATE_LIMIT = 10
+const GENERATE_RATE_WINDOW_SECONDS = 60
+
+async function enforceRateLimit(req: Request): Promise<NextResponse | null> {
+  const ip = getClientIp(req)
+  const allowed = await checkRateLimit(`generate:${ip}`, GENERATE_RATE_LIMIT, GENERATE_RATE_WINDOW_SECONDS)
+  if (allowed) return null
+  return NextResponse.json(
+    { error: "You're generating documents a little too quickly. Please wait a moment and try again." },
+    { status: 429 },
+  )
+}
 
 // Map frontend template keys → actual filenames in lib/templates/
 const TEMPLATE_FILES: Record<string, string> = {
@@ -122,6 +136,9 @@ function buildPdf(filledText: string, title: string): Promise<Buffer> {
 
 export async function GET(req: Request) {
   try {
+    const limited = await enforceRateLimit(req)
+    if (limited) return limited
+
     const templateName = new URL(req.url).searchParams.get('template_name') ?? ''
     const filename = TEMPLATE_FILES[templateName]
     if (!filename) {
@@ -141,6 +158,9 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
+    const limited = await enforceRateLimit(req)
+    if (limited) return limited
+
     const { template_name, profile } = await req.json() as {
       template_name: string
       profile?: FounderProfile | null
