@@ -13,6 +13,7 @@ import PDFDocument from 'pdfkit'
 import { renderTemplate } from '@/lib/renderTemplate'
 import { buildTemplateVars } from '@/lib/profileToTemplateVars'
 import { emptyProfile, type FounderProfile } from '@/lib/founderProfile'
+import { getRelevantFields } from '@/lib/confirmationFields'
 
 // Map frontend template keys → actual filenames in lib/templates/
 const TEMPLATE_FILES: Record<string, string> = {
@@ -117,6 +118,25 @@ function buildPdf(filledText: string, title: string): Promise<Buffer> {
 
     doc.end()
   })
+}
+
+export async function GET(req: Request) {
+  try {
+    const templateName = new URL(req.url).searchParams.get('template_name') ?? ''
+    const filename = TEMPLATE_FILES[templateName]
+    if (!filename) {
+      return NextResponse.json({ error: `Unknown template: ${templateName}` }, { status: 400 })
+    }
+
+    const templatePath = join(process.cwd(), 'lib', 'templates', `${filename}.md`)
+    const raw = readFileSync(templatePath, 'utf8')
+
+    return NextResponse.json({ fields: getRelevantFields(raw) })
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error('[generate:fields]', msg)
+    return NextResponse.json({ error: msg }, { status: 500 })
+  }
 }
 
 export async function POST(req: Request) {
