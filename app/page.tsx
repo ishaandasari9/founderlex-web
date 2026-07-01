@@ -107,13 +107,13 @@ function detectTemplate(text: string): string | null {
 // ── Download helper ───────────────────────────────────────────────────────────
 async function generateAndDownload(
   templateName: string,
-  founderDetails: Record<string, string>
+  profile: FounderProfile | null
 ): Promise<{ ok: boolean; error?: string }> {
   try {
     const res = await fetch('/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ template_name: templateName, founder_details: founderDetails }),
+      body: JSON.stringify({ template_name: templateName, profile }),
     })
     const data = await res.json()
     if (data.error) return { ok: false, error: data.error }
@@ -411,8 +411,7 @@ export default function Home() {
   // ── Generate + download a document ─────────────────────────────────────────
   const handleGenerate = useCallback(async (template: string) => {
     setGeneratingTpl(template)
-    const details: Record<string, string> = {}
-    const result = await generateAndDownload(template, details)
+    const result = await generateAndDownload(template, profileRef.current)
     if (result.ok) {
       setDocCount(prev => prev + 1)
     } else {

@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "stress": "npx tsx tests/stress-runner.ts",
-    "test:profile": "npx tsx tests/founderProfile.test.ts"
+    "test:profile": "npx tsx tests/founderProfile.test.ts",
+    "test:template": "npx tsx tests/renderTemplate.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",

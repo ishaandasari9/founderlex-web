@@ -10,6 +10,9 @@ async function getHTMLtoDOCX(): Promise<HTMLtoDOCXFn> {
   return (typeof mod === 'function' ? mod : mod.default) as HTMLtoDOCXFn
 }
 import PDFDocument from 'pdfkit'
+import { renderTemplate } from '@/lib/renderTemplate'
+import { buildTemplateVars } from '@/lib/profileToTemplateVars'
+import { emptyProfile, type FounderProfile } from '@/lib/founderProfile'
 
 // Map frontend template keys → actual filenames in lib/templates/
 const TEMPLATE_FILES: Record<string, string> = {
@@ -24,14 +27,6 @@ const TEMPLATE_FILES: Record<string, string> = {
   nonprofit_articles:              'articles-of-incorporation',
   nonprofit_bylaws:                'nonprofit-bylaws',
   nonprofit_conflict_of_interest:  'conflict-of-interest-policy',
-}
-
-function fillTemplate(template: string, details: Record<string, string>): string {
-  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => {
-    const val = details[key]
-    if (val && val.trim()) return val
-    return `[TO BE COMPLETED: ${key.replace(/_/g, ' ')}]`
-  })
 }
 
 // Strip inline markdown markers for plain-text PDF rendering
@@ -126,7 +121,10 @@ function buildPdf(filledText: string, title: string): Promise<Buffer> {
 
 export async function POST(req: Request) {
   try {
-    const { template_name, founder_details = {} } = await req.json()
+    const { template_name, profile } = await req.json() as {
+      template_name: string
+      profile?: FounderProfile | null
+    }
 
     const filename = TEMPLATE_FILES[template_name]
     if (!filename) {
@@ -135,7 +133,8 @@ export async function POST(req: Request) {
 
     const templatePath = join(process.cwd(), 'lib', 'templates', `${filename}.md`)
     const raw = readFileSync(templatePath, 'utf8')
-    const filled = fillTemplate(raw, founder_details)
+    const vars = buildTemplateVars(profile ?? emptyProfile())
+    const filled = renderTemplate(raw, vars)
 
     const title = filename.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
     const html = await marked.parse(filled)
@@ -145,7 +144,7 @@ export async function POST(req: Request) {
       buildPdf(filled, title),
     ])
 
-    const slug = (founder_details.company_name || 'document').replace(/\s+/g, '-').toLowerCase()
+    const slug = ((vars.company_name as string) || 'document').replace(/\s+/g, '-').toLowerCase()
 
     return NextResponse.json({
       docx_b64:  docxBuf.toString('base64'),

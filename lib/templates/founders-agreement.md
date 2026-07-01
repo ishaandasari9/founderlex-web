@@ -12,9 +12,9 @@
 
 This Agreement is between:
 
-- **Founder 1:** {{founder_1_name}}
-- **Founder 2:** {{founder_2_name}}
-- [Add a line for each additional founder]
+{% for founder in founders %}
+- **{{founder.name}}**
+{% endfor %}
 
 ---
 
@@ -40,9 +40,9 @@ The Company's business is: {{business_description}}
 
 The founders will own the Company in the following proportions:
 
-- **Founder 1 ({{founder_1_name}}):** {{founder_1_equity}}%
-- **Founder 2 ({{founder_2_name}}):** {{founder_2_equity}}%
-- [Add a line for each additional founder — total must equal 100%]
+{% for founder in founders %}
+- **{{founder.name}}:** {{founder.equity_pct}}%
+{% endfor %}
 
 {% if equal_equity %}
 > *Note: Equal splits are common between close co-founders. A 50/50 split means neither person can break a tie — consider adding a tiebreaker mechanism (see Section 4), and discuss with a lawyer.*
@@ -56,8 +56,9 @@ The founders will own the Company in the following proportions:
 >
 > *How to decide major decisions: "Unanimous" is simple and protective for 2-person teams, but one stubborn founder can block everything. "Majority" works for 3+ founders. Whatever you choose, add a tiebreaker for deadlocks — for example: "If founders are deadlocked for more than 30 days, either founder may call for a non-binding advisory vote from [a named mentor or advisor]."*
 
-- **Founder 1 ({{founder_1_name}}):** {{founder_1_role}}
-- **Founder 2 ({{founder_2_name}}):** {{founder_2_role}}
+{% for founder in founders %}
+- **{{founder.name}}:** {{founder.role}}
+{% endfor %}
 
 Major decisions (e.g., taking on debt, selling the company, issuing new equity, hiring/firing a founder) require [TO BE COMPLETED: e.g., "unanimous approval of all founders" / "approval of founders holding a majority of equity"] before proceeding.
 
@@ -106,8 +107,9 @@ Each founder will sign any additional documents the Company reasonably requests 
 >
 > *How to write this: Be specific. "Full-time (40+ hours/week)," "Part-time (approximately 20 hours/week)," or "Part-time until [specific date or milestone], then transitioning to full-time" are all good formats. "Part-time" by itself means different things to different people — nail it down.*
 
-- **Founder 1 ({{founder_1_name}}):** {{founder_1_commitment}}
-- **Founder 2 ({{founder_2_name}}):** {{founder_2_commitment}}
+{% for founder in founders %}
+- **{{founder.name}}:** {{founder.commitment}}
+{% endfor %}
 
 ---
 
@@ -119,8 +121,9 @@ Each founder will sign any additional documents the Company reasonably requests 
 
 Founder compensation at this stage:
 
-- **Founder 1 ({{founder_1_name}}):** [TO BE COMPLETED: e.g., "No salary until the company reaches $5,000/month in revenue, then revisit" / "Fixed monthly salary of $X/month starting immediately"]
-- **Founder 2 ({{founder_2_name}}):** [TO BE COMPLETED: e.g., "No salary until the company reaches $5,000/month in revenue, then revisit" / "Fixed monthly salary of $X/month starting immediately"]
+{% for founder in founders %}
+- **{{founder.name}}:** [TO BE COMPLETED: e.g., "No salary until the company reaches $5,000/month in revenue, then revisit" / "Fixed monthly salary of $X/month starting immediately"]
+{% endfor %}
 
 ---
 
@@ -168,8 +171,9 @@ By signing below, each founder agrees to all terms of this Agreement.
 
 | Founder | Signature | Date |
 |---------|-----------|------|
-| **Founder 1:** {{founder_1_name}} | _________________ | __________ |
-| **Founder 2:** {{founder_2_name}} | _________________ | __________ |
+{% for founder in founders %}
+| **{{founder.name}}** | _________________ | __________ |
+{% endfor %}
 
 ---
 
