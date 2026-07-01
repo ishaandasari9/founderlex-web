@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { readFileSync } from 'fs'
 import { join } from 'path'
+import { detectOutOfScope } from './outOfScopeGuard'
 
 let _client: Anthropic | null = null
 function getClient() {
@@ -41,6 +42,9 @@ export async function getChatResponse(
   profileContext?: string,
   referenceContext?: string,
 ): Promise<string> {
+  const guardResponse = detectOutOfScope(messages)
+  if (guardResponse) return guardResponse
+
   const contextParts = [
     founderName ? `The founder's name is ${founderName} — use their name naturally once or twice.` : '',
     buildingDesc ? `They described what they're building as: "${buildingDesc}".` : '',
