@@ -27,7 +27,7 @@ const RULES: Rule[] = [
   {
     // Active disputes and received legal threats (cease & desist, being sued, infringement claims)
     patterns: [
-      /cease (and|&) desist/i,
+      /cease[\s-]+(and|&)[\s-]+desist/i,
       /\b(suing|sued|sues|sue)\b.{0,20}\b(me|us)\b/i,
       /\bthreatening to sue\b/i,
       /\bgot served\b/i,
@@ -68,7 +68,7 @@ const RULES: Rule[] = [
     // Tax strategy
     patterns: [
       /\btax (strategy|burden|planning)\b/i,
-      /\bminimize (my |our |your )?tax/i,
+      /\bminimize\b[\s\S]{0,25}\btax/i,
       /\bsalary or distributions\b/i,
       /\bs-corp election\b/i,
     ],
