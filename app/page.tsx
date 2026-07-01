@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { validateProfile, emptyProfile, type FounderProfile } from '@/lib/founderProfile'
 import type { ConfirmField } from '@/lib/confirmationFields'
+import ConfirmDocPanel, { type ConfirmPanelState } from '@/components/ConfirmDocPanel'
 
 // ── React Bits — SSR disabled (motion/react needs window) ────────────────────
 // Cast to any to bypass TypeScript inference quirks from .jsx component files
@@ -318,15 +319,6 @@ function DocCard({
 }
 
 // ── Confirmation gate (Human-in-the-loop Gate 2) ─────────────────────────────
-interface ConfirmPanelState {
-  template: string
-  fields: ConfirmField[]
-  companyName: string
-  state: string
-  structure: string
-  description: string
-  founders: { name: string; equity_pct: number }[]
-}
 
 function buildEffectiveProfile(base: FounderProfile | null, panel: ConfirmPanelState): FounderProfile {
   const b = base ?? emptyProfile()
@@ -342,163 +334,6 @@ function buildEffectiveProfile(base: FounderProfile | null, panel: ConfirmPanelS
       equity_pct: panel.founders[i]?.equity_pct ?? f.equity_pct,
     })),
   }
-}
-
-function ConfirmDocPanel({
-  panel, validation, generating, onChange, onCancel, onConfirm,
-}: {
-  panel: ConfirmPanelState
-  validation: { valid: boolean; errors: string[] }
-  generating: boolean
-  onChange: (next: ConfirmPanelState) => void
-  onCancel: () => void
-  onConfirm: () => void
-}) {
-  const label = TEMPLATE_LABELS[panel.template] ?? panel.template
-
-  const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '9px 11px', borderRadius: 8, boxSizing: 'border-box',
-    border: '1px solid rgba(42,36,32,0.18)', fontFamily: NEWSREADER, fontSize: 15,
-    color: INK, background: WHITE,
-  }
-  const labelStyle: React.CSSProperties = {
-    display: 'block', fontFamily: MONO, fontSize: 10.5, letterSpacing: '0.08em',
-    textTransform: 'uppercase', color: MUTED, marginBottom: 6,
-  }
-
-  const scalarSetters: Record<string, (v: string) => void> = {
-    company_name: v => onChange({ ...panel, companyName: v }),
-    state: v => onChange({ ...panel, state: v }),
-    structure: v => onChange({ ...panel, structure: v }),
-    description: v => onChange({ ...panel, description: v }),
-  }
-  const scalarValues: Record<string, string> = {
-    company_name: panel.companyName,
-    state: panel.state,
-    structure: panel.structure,
-    description: panel.description,
-  }
-
-  return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 500,
-      background: 'rgba(42,36,32,0.45)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
-    }}>
-      <div style={{
-        width: '100%', maxWidth: 480, maxHeight: '86vh', overflowY: 'auto',
-        background: CREAM, borderRadius: 16, boxShadow: '0 30px 60px -20px rgba(0,0,0,0.4)',
-        padding: 26, display: 'flex', flexDirection: 'column', gap: 18,
-      }}>
-        <div>
-          <span style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: '0.14em', textTransform: 'uppercase', color: FAINT }}>
-            Confirm before generating
-          </span>
-          <h2 style={{ margin: '4px 0 0', fontFamily: BRICOLAGE, fontWeight: 600, fontSize: 21, color: INK }}>{label}</h2>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {panel.fields.map(field => {
-            if (field.type === 'founders') {
-              return (
-                <div key="founders">
-                  <span style={labelStyle}>Founders</span>
-                  {panel.founders.length === 0 ? (
-                    <span style={{ fontFamily: NEWSREADER, fontSize: 14, color: FAINT }}>No founders on file yet.</span>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {panel.founders.map((f, i) => (
-                        <div key={i} style={{ display: 'flex', gap: 8 }}>
-                          <input
-                            style={{ ...inputStyle, flex: 2 }}
-                            value={f.name}
-                            placeholder="Founder name"
-                            onChange={e => {
-                              const next = [...panel.founders]
-                              next[i] = { ...next[i], name: e.target.value }
-                              onChange({ ...panel, founders: next })
-                            }}
-                          />
-                          <input
-                            style={{ ...inputStyle, flex: 1 }}
-                            type="number"
-                            value={f.equity_pct}
-                            placeholder="Equity %"
-                            onChange={e => {
-                              const next = [...panel.founders]
-                              next[i] = { ...next[i], equity_pct: parseFloat(e.target.value) || 0 }
-                              onChange({ ...panel, founders: next })
-                            }}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )
-            }
-            return (
-              <div key={field.key}>
-                <label style={labelStyle}>{field.label}</label>
-                <input
-                  style={inputStyle}
-                  value={scalarValues[field.key] ?? ''}
-                  placeholder={field.label}
-                  onChange={e => scalarSetters[field.key]?.(e.target.value)}
-                />
-              </div>
-            )
-          })}
-        </div>
-
-        {!validation.valid && (
-          <div style={{
-            background: '#FDF3E0', border: '1px solid #E8C77A', borderRadius: 10,
-            padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 4,
-          }}>
-            <span style={{ fontFamily: BRICOLAGE, fontWeight: 600, fontSize: 12.5, color: '#8A6412' }}>
-              Double-check before generating
-            </span>
-            {validation.errors.map((err, i) => (
-              <span key={i} style={{ fontFamily: NEWSREADER, fontSize: 13.5, color: '#6B4E0E' }}>{err}</span>
-            ))}
-          </div>
-        )}
-
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7 }}>
-          <ShieldCheck size={13} color={MUTED} strokeWidth={1.6} style={{ marginTop: 2, flexShrink: 0 }} aria-hidden />
-          <span style={{ fontFamily: MONO, fontSize: 10.5, lineHeight: 1.6, color: MUTED }}>
-            Not legal advice. Have a licensed attorney review before signing or filing.
-          </span>
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-          <button
-            onClick={onCancel}
-            disabled={generating}
-            style={{
-              fontFamily: BRICOLAGE, fontWeight: 600, fontSize: 14, color: INK,
-              background: 'transparent', border: '1px solid rgba(42,36,32,0.2)',
-              borderRadius: 10, padding: '10px 18px', cursor: generating ? 'not-allowed' : 'pointer',
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={generating ? undefined : onConfirm}
-            disabled={generating}
-            style={{
-              fontFamily: BRICOLAGE, fontWeight: 600, fontSize: 14, color: CREAM,
-              background: RED, border: 'none', borderRadius: 10, padding: '10px 18px',
-              cursor: generating ? 'wait' : 'pointer',
-            }}
-          >
-            {generating ? 'Generating…' : 'Looks right — generate'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
 }
 
 // ── Loading bubble ────────────────────────────────────────────────────────────
