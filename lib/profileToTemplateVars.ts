@@ -15,8 +15,10 @@ export function buildTemplateVars(profile: FounderProfile): Record<string, unkno
 
   return {
     company_name: profile.company_name ?? '',
+    organization_name: profile.company_name ?? '',
     business_description: profile.product_description,
     state_of_formation: profile.state ?? '',
+    state_of_incorporation: profile.state ?? '',
     governing_state: profile.state ?? '',
     business_structure: profile.structure ?? '',
     effective_date: effectiveDate,
