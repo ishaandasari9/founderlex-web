@@ -85,7 +85,7 @@ export default function ConfirmDocPanel({
           <span className="confirm-panel-eyebrow">Confirm before generating</span>
           <h2 id="confirm-panel-title" className="confirm-panel-title">{label}</h2>
           <p className="confirm-panel-subtitle">
-            Review the details below. You can edit anything before we draft the document.
+            Review the details below. You can edit anything before we draft your starter document.
           </p>
         </header>
 
@@ -165,7 +165,7 @@ export default function ConfirmDocPanel({
         <div className="confirm-panel-disclaimer">
           <ShieldCheck size={14} color={MUTED} strokeWidth={1.6} aria-hidden />
           <span>
-            Not legal advice. Have a licensed attorney review before signing or filing.
+            Educational, not legal advice. Have a licensed attorney review before signing or filing.
           </span>
         </div>
 

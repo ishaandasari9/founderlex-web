@@ -591,7 +591,7 @@ export default function Home() {
         {!doorBusy && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, textAlign: 'center' }}>
           <p style={{ margin: 0, fontFamily: NEWSREADER, fontSize: 'clamp(20px,2.2vw,27px)', lineHeight: 1.4, letterSpacing: '-0.01em', color: INK, maxWidth: '22ch' }}>
-            Legal help, finally on your side.{' '}<span style={{ color: FAINTER }}>Open the door.</span>
+            Startup legal basics, in plain English.{' '}<span style={{ color: FAINTER }}>Open the door.</span>
           </p>
           <CtaButton onClick={handleStepInside}>
             Step inside <ArrowRight size={18} strokeWidth={1.8} />
@@ -626,10 +626,10 @@ export default function Home() {
                 <ArchPip /> You&rsquo;re welcome in
               </span>
               <h1 style={{ margin: 0, fontFamily: BRICOLAGE, fontWeight: 600, fontSize: 'clamp(32px,4.8vw,58px)', lineHeight: 1.03, letterSpacing: '-0.025em', color: INK }}>
-                FounderLex explains startup law in plain English.
+                FounderLex explains startup legal basics in plain English.
               </h1>
               <p style={{ margin: 0, fontFamily: NEWSREADER, fontSize: 'clamp(18px,1.7vw,21px)', lineHeight: 1.6, color: MUTED, maxWidth: '48ch' }}>
-                A calm place to ask the questions you're afraid sound dumb. You'll walk out with the documents you actually need.
+                A guided assistant for first-time founders. Understand the basics, figure out which documents you need, and draft them with your details — with a path to a real lawyer when it&apos;s beyond the basics.
               </p>
             </div>
           </GlassCard>
@@ -641,7 +641,7 @@ export default function Home() {
                 <Counter value={docCount} fontSize={36} fontWeight="700" textColor={RED} gap={2} />
               </Suspense>
               <span style={{ fontFamily: BRICOLAGE, fontWeight: 500, fontSize: 16, color: MUTED }}>
-                {docCount === 1 ? 'document generated this session' : 'documents generated this session'}
+                {docCount === 1 ? 'starter document drafted this session' : 'starter documents drafted this session'}
               </span>
             </GlassCard>
           )}
@@ -650,8 +650,8 @@ export default function Home() {
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 14, width: '100%', maxWidth: 880 }}>
             {([
               { icon: <MessageSquareText size={20} color={RED} strokeWidth={1.6} />, step: '01 · Ask', title: 'Say it in your own words', body: 'Describe what you’re building. No legal vocabulary required.' },
-              { icon: <BookOpen size={20} color={RED} strokeWidth={1.6} />, step: '02 · Understand', title: 'Get a straight answer', body: 'Plain explanations, honest about limits. No fake confidence.' },
-              { icon: <FileText size={20} color={RED} strokeWidth={1.6} />, step: '03 · Receive', title: 'Walk out with documents', body: 'Eleven core documents in your words. Yours to edit in Word and PDF.' },
+              { icon: <BookOpen size={20} color={RED} strokeWidth={1.6} />, step: '02 · Understand', title: 'Understand the basics', body: 'Plain explanations of what matters and why — honest about limits, and clear when it’s time for a lawyer.' },
+              { icon: <FileText size={20} color={RED} strokeWidth={1.6} />, step: '03 · Draft', title: 'Draft with your details', body: 'Starter documents in your words, filled in with your specifics. Yours to review, edit, and take to a lawyer.' },
             ] as const).map(({ icon, step, title, body }) => (
               <GlassCard key={step} style={{ flex: '1 1 240px', minWidth: 230, padding: '24px 22px', display: 'flex', flexDirection: 'column', gap: 11 }}>
                 <span style={{ width: 40, height: 40, borderRadius: 11, background: 'rgba(242,234,224,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{icon}</span>
@@ -669,14 +669,14 @@ export default function Home() {
                 <ArchPip /> What we draft
               </span>
               <h2 style={{ margin: 0, fontFamily: BRICOLAGE, fontWeight: 500, fontSize: 'clamp(22px,2.8vw,32px)', lineHeight: 1.04, letterSpacing: '-0.02em', color: INK }}>
-                Eleven documents. Built for real founders.
+                Eleven starter documents. Built for real founders.
               </h2>
             </div>
 
             <DocumentMarquee items={allDocuments} />
 
             <p style={{ margin: 0, fontSize: 15.5, lineHeight: 1.6, color: MUTED, maxWidth: '62ch', padding: '0 4px' }}>
-              Covers product, consulting, and nonprofit structures. Anything beyond these, we hand off to a real lawyer rather than guess.
+              Covers product, consulting, and nonprofit structures. When something&apos;s beyond the basics, we point you to a real lawyer instead of guessing.
             </p>
           </div>
 
@@ -688,14 +688,14 @@ export default function Home() {
             <span style={{ display: 'flex', alignItems: 'flex-start', gap: 7, maxWidth: '42ch' }}>
               <ShieldCheck size={13} color={MUTED} strokeWidth={1.6} style={{ marginTop: 3, flexShrink: 0 }} aria-hidden />
               <span style={{ fontFamily: MONO, fontSize: 11, lineHeight: 1.7, color: MUTED, textAlign: 'left' }}>
-                Educational, not legal advice. We point you to a real lawyer when it matters.
+                Educational, not legal advice — and not a law firm. We point you to a real lawyer when it matters.
               </span>
             </span>
           </div>
 
           {/* Footnote */}
           <p style={{ margin: 0, maxWidth: '76ch', fontFamily: MONO, fontSize: 11, lineHeight: 1.75, color: MUTED, textAlign: 'center', borderTop: '1px solid rgba(42,36,32,0.10)', paddingTop: 'clamp(22px,3vh,30px)' }}>
-            FounderLex provides legal information and document templates for educational purposes only. It is not a law firm and does not provide legal advice. Using it does not create an attorney-client relationship. For advice about your specific situation, consult a licensed attorney.
+            FounderLex is a guided assistant that provides legal information and document templates for educational purposes only. It is not a law firm and does not provide legal advice. Using it does not create an attorney-client relationship. For advice about your specific situation, consult a licensed attorney.
           </p>
         </div>
       </section>
@@ -743,7 +743,7 @@ export default function Home() {
               <DoorGlyph w={28} h={31} panelTop={10} outerR={14} innerR={6} />
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div style={{ background: TILE, color: INK, padding: '15px 18px', borderRadius: '4px 16px 16px 16px', fontFamily: NEWSREADER, fontSize: 17, lineHeight: 1.55 }}>
-                  Hi, I'm FounderLex. Tell me what you're building and I'll walk you through the legal basics in plain English. <span style={{ color: MUTED }}>No legal knowledge needed.</span>
+                  Hi, I&apos;m FounderLex. Tell me what you&apos;re building — I&apos;ll explain the legal basics in plain English, help you figure out which documents you need, and draft them with your details. <span style={{ color: MUTED }}>No legal background needed.</span>
                 </div>
                 {messages.length === 0 && !isLoading && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -796,7 +796,7 @@ export default function Home() {
                 onChange={e => setDraft(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(draft) } }}
                 aria-label="Ask FounderLex a question"
-                placeholder="Ask anything about starting your business…"
+                placeholder="Describe what you're building, or ask a legal-basics question…"
                 disabled={isLoading}
                 style={{ flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', fontFamily: NEWSREADER, fontSize: 16, color: INK }}
               />
@@ -805,7 +805,7 @@ export default function Home() {
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7, marginTop: 10, paddingLeft: 4 }}>
               <ShieldCheck size={12} color={FAINT} strokeWidth={1.6} style={{ marginTop: 2, flexShrink: 0 }} aria-hidden />
               <span style={{ fontFamily: MONO, fontSize: 10.5, lineHeight: 1.6, color: FAINT }}>
-                Educational, not legal advice. I'll point you to a real lawyer when it matters.
+                Educational, not legal advice — and not a law firm. I&apos;ll point you to a real lawyer when it matters.
               </span>
             </div>
           </div>
