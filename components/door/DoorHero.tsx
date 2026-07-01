@@ -31,6 +31,7 @@ const DoorScene3D = dynamic(() => import('./DoorScene3D'), {
 })
 
 const SWING_MS = 800
+const HANDOFF_MS = 480
 
 export interface DoorHeroProps {
   enterSignal: number
@@ -59,8 +60,8 @@ function Door2DWithGlow({
       setSwingOpen(true)
       onTransitionActive?.(true)
       const timer = window.setTimeout(() => {
-        onTransitionActive?.(false)
         onEnterApp()
+        window.setTimeout(() => onTransitionActive?.(false), HANDOFF_MS)
       }, SWING_MS)
       return () => window.clearTimeout(timer)
     }
@@ -72,8 +73,8 @@ function Door2DWithGlow({
       setSwingOpen(false)
       onTransitionActive?.(true)
       const timer = window.setTimeout(() => {
-        onTransitionActive?.(false)
         onExitComplete()
+        window.setTimeout(() => onTransitionActive?.(false), HANDOFF_MS)
       }, SWING_MS)
       return () => window.clearTimeout(timer)
     }
@@ -182,14 +183,18 @@ export default function DoorHero({
             onTransitionActive?.(true)
           }}
           onEnterApp={() => {
-            setImmersive(false)
-            onTransitionActive?.(false)
             onEnterApp()
+            window.setTimeout(() => {
+              setImmersive(false)
+              onTransitionActive?.(false)
+            }, HANDOFF_MS)
           }}
           onExitComplete={() => {
-            setImmersive(false)
-            onTransitionActive?.(false)
             onExitComplete()
+            window.setTimeout(() => {
+              setImmersive(false)
+              onTransitionActive?.(false)
+            }, HANDOFF_MS)
           }}
           onWebGLLost={() => setForce2D(true)}
           onRequestEnter={onRequestEnter}

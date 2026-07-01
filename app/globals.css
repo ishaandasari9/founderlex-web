@@ -191,7 +191,7 @@ input { font-family: inherit; }
 /* ─── About trust signals ──────────────────────────────────── */
 .about-trust-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
   gap: 14px;
   width: 100%;
 }
@@ -247,8 +247,8 @@ input { font-family: inherit; }
 .confirm-panel-modal {
   width: 100%;
   max-width: 500px;
-  max-height: 86vh;
-  overflow-y: auto;
+  max-height: 85vh;
+  overflow: hidden;
   background: #F7F2EB;
   border: 1px solid rgba(42, 36, 32, 0.08);
   border-radius: 20px;
@@ -258,7 +258,8 @@ input { font-family: inherit; }
   padding: 28px 28px 24px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
+  min-height: 0;
   opacity: 0;
   transform: scale(0.97) translateY(6px);
   transition: opacity 200ms ease-out, transform 200ms ease-out;
@@ -279,6 +280,17 @@ input { font-family: inherit; }
   display: flex;
   flex-direction: column;
   gap: 6px;
+  flex-shrink: 0;
+}
+
+.confirm-panel-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  margin-right: -6px;
+  padding-right: 6px;
 }
 
 .confirm-panel-eyebrow {
@@ -394,6 +406,7 @@ input { font-family: inherit; }
 }
 
 .confirm-panel-notice {
+  flex-shrink: 0;
   background: linear-gradient(135deg, #FDF6E8 0%, #FBF0DC 100%);
   border: 1px solid rgba(219, 164, 60, 0.35);
   border-left: 3px solid #D4922A;
@@ -419,6 +432,7 @@ input { font-family: inherit; }
 }
 
 .confirm-panel-disclaimer {
+  flex-shrink: 0;
   display: flex;
   align-items: flex-start;
   gap: 8px;
@@ -436,10 +450,11 @@ input { font-family: inherit; }
 }
 
 .confirm-panel-actions {
+  flex-shrink: 0;
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  padding-top: 4px;
+  padding-top: 2px;
 }
 
 .confirm-panel-btn {
@@ -485,10 +500,148 @@ input { font-family: inherit; }
   transform: translateY(0);
 }
 
+.doc-card-wrap {
+  width: 220px;
+  max-width: 100%;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .confirm-panel-backdrop,
   .confirm-panel-modal {
     transition: none;
+  }
+}
+
+/* ─── Mobile polish (~375px) ───────────────────────────────── */
+@media (max-width: 480px) {
+  .confirm-panel-backdrop {
+    padding: 12px;
+    align-items: center;
+  }
+
+  .confirm-panel-modal {
+    padding: 20px 18px 18px;
+    max-height: 88vh;
+    border-radius: 16px;
+    gap: 12px;
+  }
+
+  .confirm-panel-title {
+    font-size: 19px;
+  }
+
+  .confirm-panel-subtitle {
+    font-size: 14px;
+  }
+
+  .confirm-panel-founder-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .confirm-panel-input-wrap--narrow {
+    flex: none;
+    min-width: 0;
+  }
+
+  .confirm-panel-actions {
+    flex-direction: column-reverse;
+    gap: 8px;
+  }
+
+  .confirm-panel-btn {
+    width: 100%;
+    text-align: center;
+    padding: 12px 16px;
+  }
+
+  .about-glass-layout {
+    padding-top: 64px !important;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+    gap: 24px !important;
+  }
+
+  .about-back-link {
+    top: 14px !important;
+    left: 14px !important;
+    font-size: 11px !important;
+  }
+
+  .about-step-cards {
+    gap: 10px !important;
+  }
+
+  .about-step-card {
+    flex: 1 1 100% !important;
+    min-width: 0 !important;
+  }
+
+  .about-trust-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .about-trust-card {
+    padding: 20px 18px !important;
+  }
+
+  .doc-marquee-card {
+    min-width: 200px;
+    padding: 10px 12px;
+  }
+
+  .doc-marquee-card__label {
+    white-space: normal;
+    font-size: 13px;
+  }
+
+  .chat-header {
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    padding: 12px 0 !important;
+  }
+
+  .chat-header-brand {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .chat-header-actions {
+    flex: 1 1 100%;
+    justify-content: flex-end;
+    gap: 10px !important;
+    flex-wrap: wrap;
+  }
+
+  .chat-header-status {
+    display: none !important;
+  }
+
+  .chat-clear-btn {
+    font-size: 9px !important;
+    letter-spacing: 0.06em !important;
+  }
+
+  .doc-card-wrap {
+    width: min(220px, calc(100vw - 72px));
+    max-width: 100%;
+  }
+
+  .door-landing {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+    gap: 20px !important;
+  }
+
+  .door-landing-copy {
+    font-size: 18px !important;
+  }
+
+  .cta-button--lg {
+    font-size: 16px !important;
+    padding: 14px 22px !important;
   }
 }
 

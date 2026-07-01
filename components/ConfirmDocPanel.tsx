@@ -89,6 +89,7 @@ export default function ConfirmDocPanel({
           </p>
         </header>
 
+        <div className="confirm-panel-scroll">
         <div className="confirm-panel-fields">
           {panel.fields.map(field => {
             if (field.type === 'founders') {
@@ -151,6 +152,7 @@ export default function ConfirmDocPanel({
               </div>
             )
           })}
+        </div>
         </div>
 
         {!validation.valid && (

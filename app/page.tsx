@@ -173,6 +173,7 @@ function CtaButton({ children, onClick, lg = false }: { children: React.ReactNod
     <button onClick={onClick}
       onMouseEnter={() => setHov(true)} onMouseLeave={() => { setHov(false); setAct(false) }}
       onMouseDown={() => setAct(true)} onMouseUp={() => setAct(false)}
+      className={lg ? 'cta-button--lg' : undefined}
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 9,
         fontFamily: BRICOLAGE, fontWeight: 600, fontSize: lg ? 18 : 17, color: CREAM,
@@ -208,6 +209,7 @@ function BackLink({ label, onClick }: { label: string; onClick: () => void }) {
   const [hov, setHov] = useState(false)
   return (
     <button onClick={onClick} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+      className="about-back-link"
       style={{
         position: 'absolute', top: 20, left: 22,
         display: 'inline-flex', alignItems: 'center', gap: 7,
@@ -297,7 +299,7 @@ function DocCard({
   )
 
   return (
-    <div style={{ width: 220, flexShrink: 0 }}>
+    <div className="doc-card-wrap" style={{ flexShrink: 0 }}>
       <Suspense fallback={
         <div style={{ width: 220, height: 160, borderRadius: 14, background: WHITE, border: `1px solid rgba(42,36,32,0.10)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <span style={{ fontFamily: MONO, fontSize: 11, color: FAINT }}>Loading…</span>
@@ -371,6 +373,9 @@ export default function Home() {
   const [enterSignal, setEnterSignal]     = useState(0)
   const [exitSignal, setExitSignal]       = useState(0)
   const [doorBusy, setDoorBusy]           = useState(false)
+  const [isExitingAbout, setIsExitingAbout] = useState(false)
+
+  const HANDOFF_MS = 480
 
   const scrollRef    = useRef<HTMLDivElement>(null)
   const messagesRef  = useRef<Msg[]>([])
@@ -515,18 +520,26 @@ export default function Home() {
 
   const handleBackToDoor = useCallback(() => {
     if (act !== 'about' || doorBusy) return
+    setIsExitingAbout(true)
     setExitSignal(s => s + 1)
   }, [act, doorBusy])
 
   const handleExitComplete = useCallback(() => {
     setAct('door')
+    window.setTimeout(() => setIsExitingAbout(false), HANDOFF_MS)
   }, [])
+
+  const doorEnterHandoff = doorBusy && act === 'about' && !isExitingAbout
+  const doorExitAnim = doorBusy && isExitingAbout
+  const showDoorChrome = act === 'door' && !doorBusy
 
   const scene = (which: Act, z: number): React.CSSProperties => ({
     position: 'absolute', inset: 0, zIndex: z,
     opacity: act === which ? 1 : 0,
     pointerEvents: act === which ? 'auto' : 'none',
-    transition: which === 'about' ? 'opacity .55s ease' : 'opacity .5s ease',
+    transition: which === 'about' || which === 'door'
+      ? `opacity ${HANDOFF_MS}ms ease-in-out`
+      : 'opacity .5s ease',
   })
 
   // All 11 templates organized by category
@@ -568,16 +581,15 @@ export default function Home() {
       {/* ══════════════════════════════════════════════════════════════════
           ACT 1 — THE DOOR
       ══════════════════════════════════════════════════════════════════ */}
-      <section style={{
-        ...scene('door', act === 'door' || doorBusy ? 30 : 0),
-        opacity: act === 'door' || doorBusy ? 1 : 0,
-        pointerEvents: act === 'door' || doorBusy ? 'auto' : 'none',
+      <section className="door-landing" style={{
+        ...scene('door', doorExitAnim || (doorBusy && act === 'door') ? 300 : doorEnterHandoff ? 20 : act === 'door' ? 30 : 0),
+        opacity: doorEnterHandoff ? 0 : act === 'door' || doorBusy ? 1 : 0,
+        pointerEvents: showDoorChrome ? 'auto' : 'none',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         justifyContent: 'center', gap: 'clamp(24px,5vh,52px)',
         padding: 'clamp(28px,6vh,64px) 24px', background: CREAM,
-        zIndex: doorBusy ? 300 : act === 'door' ? 30 : 0,
       }}>
-        {!doorBusy && <Wordmark size={25} />}
+        {showDoorChrome && <Wordmark size={25} />}
 
         <DoorHero
           enterSignal={enterSignal}
@@ -588,9 +600,9 @@ export default function Home() {
           onTransitionActive={setDoorBusy}
         />
 
-        {!doorBusy && (
+        {showDoorChrome && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, textAlign: 'center' }}>
-          <p style={{ margin: 0, fontFamily: NEWSREADER, fontSize: 'clamp(20px,2.2vw,27px)', lineHeight: 1.4, letterSpacing: '-0.01em', color: INK, maxWidth: '22ch' }}>
+          <p className="door-landing-copy" style={{ margin: 0, fontFamily: NEWSREADER, fontSize: 'clamp(20px,2.2vw,27px)', lineHeight: 1.4, letterSpacing: '-0.01em', color: INK, maxWidth: '22ch' }}>
             Startup legal basics, in plain English.{' '}<span style={{ color: FAINTER }}>Open the door.</span>
           </p>
           <CtaButton onClick={handleStepInside}>
@@ -608,6 +620,8 @@ export default function Home() {
       ══════════════════════════════════════════════════════════════════ */}
       <section style={{
         ...scene('about', act === 'about' ? 30 : 10),
+        opacity: act === 'about' && !(doorBusy && isExitingAbout) ? 1 : 0,
+        pointerEvents: act === 'about' && !(doorBusy && isExitingAbout) ? 'auto' : 'none',
         overflowY: 'auto',
         background: 'radial-gradient(125% 90% at 50% 6%, #FFFDF8 0%, #FBF3E4 30%, #F7F2EB 60%)',
       }}>
@@ -647,13 +661,13 @@ export default function Home() {
           )}
 
           {/* 3 interactive glass step cards */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 14, width: '100%', maxWidth: 880 }}>
+          <div className="about-step-cards" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 14, width: '100%', maxWidth: 880 }}>
             {([
               { icon: <MessageSquareText size={20} color={RED} strokeWidth={1.6} />, step: '01 · Ask', title: 'Say it in your own words', body: 'Describe what you’re building. No legal vocabulary required.' },
               { icon: <BookOpen size={20} color={RED} strokeWidth={1.6} />, step: '02 · Understand', title: 'Understand the basics', body: 'Plain explanations of what matters and why, honest about limits, and clear when it’s time for a lawyer.' },
               { icon: <FileText size={20} color={RED} strokeWidth={1.6} />, step: '03 · Draft', title: 'Draft with your details', body: 'Starter documents in your words, filled in with your specifics. Yours to review, edit, and take to a lawyer.' },
             ] as const).map(({ icon, step, title, body }) => (
-              <GlassCard key={step} style={{ flex: '1 1 240px', minWidth: 230, padding: '24px 22px', display: 'flex', flexDirection: 'column', gap: 11 }}>
+              <GlassCard key={step} className="about-step-card" style={{ flex: '1 1 240px', minWidth: 230, padding: '24px 22px', display: 'flex', flexDirection: 'column', gap: 11 }}>
                 <span style={{ width: 40, height: 40, borderRadius: 11, background: 'rgba(242,234,224,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{icon}</span>
                 <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '0.16em', textTransform: 'uppercase', color: FAINT }}>{step}</div>
                 <h3 style={{ margin: 0, fontFamily: BRICOLAGE, fontWeight: 600, fontSize: 18, lineHeight: 1.2, color: INK }}>{title}</h3>
@@ -772,20 +786,21 @@ export default function Home() {
         <div style={{ width: '100%', maxWidth: 760, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, padding: '0 clamp(14px,3vw,22px)' }}>
 
           {/* Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 4px', borderBottom: '1px solid rgba(42,36,32,0.10)', flexShrink: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+          <div className="chat-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 4px', borderBottom: '1px solid rgba(42,36,32,0.10)', flexShrink: 0 }}>
+            <div className="chat-header-brand" style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
               <DoorGlyph w={16} h={18} panelTop={6} outerR={8} innerR={3} />
               <span style={{ fontFamily: BRICOLAGE, fontWeight: 700, fontSize: 15, color: INK }}>
                 Founder<span style={{ color: RED }}>Lex</span>
               </span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: MONO, fontSize: 10, letterSpacing: '0.10em', textTransform: 'uppercase', color: FAINT }}>
+            <div className="chat-header-actions" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <span className="chat-header-status" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: MONO, fontSize: 10, letterSpacing: '0.10em', textTransform: 'uppercase', color: FAINT }}>
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3F9D6A', flexShrink: 0 }} />
                 Here with you
               </span>
               {messages.length > 0 && (
                 <button onClick={handleClearSession}
+                  className="chat-clear-btn"
                   style={{
                     fontFamily: MONO, fontSize: 10, letterSpacing: '0.10em', textTransform: 'uppercase',
                     color: FAINT, background: 'none', border: 'none', cursor: 'pointer', padding: 0,

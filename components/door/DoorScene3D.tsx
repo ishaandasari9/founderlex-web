@@ -45,7 +45,23 @@ function applyFrame(
   camera: Camera,
   camStart: { x: number; y: number; z: number },
   camEnd: { x: number; y: number; z: number },
+  dir: TransitionDir | null,
 ) {
+  if (dir === 'exit') {
+    // Retreat: door swings shut while stepping back out to the landing
+    const doorPhase = easeInOutCubic(remap(t, lite ? 0.26 : 0.2, 1))
+    openAmount.current = doorPhase
+
+    const walkT = easeInOutCubic(remap(t, 0, 1))
+    camera.position.set(
+      camStart.x + (camEnd.x - camStart.x) * walkT,
+      camStart.y + (camEnd.y - camStart.y) * walkT,
+      camStart.z + (camEnd.z - camStart.z) * walkT,
+    )
+    camera.lookAt(0, 0.02 + walkT * 0.04, -1.2 - walkT * 0.8)
+    return
+  }
+
   const doorPhase = easeInOutCubic(remap(t, 0, lite ? 0.55 : 0.5))
   openAmount.current = doorPhase
 
@@ -93,7 +109,7 @@ function CinematicRig({
   const camEnd = { x: 0, y: 0.05, z: lite ? -0.3 : -0.5 }
 
   const applyAt = useCallback((t: number) => {
-    applyFrame(t, lite, openAmount, camera, camStart, camEnd)
+    applyFrame(t, lite, openAmount, camera, camStart, camEnd, direction.current)
   }, [camera, lite])
 
   const finishIdle = useCallback(() => {
