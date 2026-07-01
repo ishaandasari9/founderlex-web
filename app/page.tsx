@@ -9,6 +9,7 @@ import {
 import { validateProfile, emptyProfile, type FounderProfile } from '@/lib/founderProfile'
 import type { ConfirmField } from '@/lib/confirmationFields'
 import ConfirmDocPanel, { type ConfirmPanelState } from '@/components/ConfirmDocPanel'
+import ConsentGate from '@/components/ConsentGate'
 
 // ── React Bits — SSR disabled (motion/react needs window) ────────────────────
 // Cast to any to bypass TypeScript inference quirks from .jsx component files
@@ -374,6 +375,8 @@ export default function Home() {
   const [exitSignal, setExitSignal]       = useState(0)
   const [doorBusy, setDoorBusy]           = useState(false)
   const [isExitingAbout, setIsExitingAbout] = useState(false)
+  const [showConsent, setShowConsent]     = useState(false)
+  const [consentGiven, setConsentGiven]   = useState(false)
 
   const HANDOFF_MS = 480
 
@@ -528,6 +531,23 @@ export default function Home() {
     setAct('door')
     window.setTimeout(() => setIsExitingAbout(false), HANDOFF_MS)
   }, [])
+
+  // ── Consent gate (one-time, in-session only — never stored/logged/persisted) ─
+  const handleRequestChat = useCallback(() => {
+    if (consentGiven) { setAct('chat'); return }
+    setShowConsent(true)
+  }, [consentGiven])
+
+  const handleConsentAgree = useCallback(() => {
+    setShowConsent(false)
+    setConsentGiven(true)
+    setAct('chat')
+  }, [])
+
+  const handleConsentDisagree = useCallback(() => {
+    setShowConsent(false)
+    handleBackToDoor()
+  }, [handleBackToDoor])
 
   const doorEnterHandoff = doorBusy && act === 'about' && !isExitingAbout
   const doorExitAnim = doorBusy && isExitingAbout
@@ -758,7 +778,7 @@ export default function Home() {
 
           {/* CTA */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, textAlign: 'center' }}>
-            <CtaButton onClick={() => setAct('chat')} lg>
+            <CtaButton onClick={handleRequestChat} lg>
               Start with a question <ArrowRight size={18} strokeWidth={1.8} />
             </CtaButton>
             <span style={{ display: 'flex', alignItems: 'flex-start', gap: 7, maxWidth: '42ch' }}>
@@ -888,6 +908,13 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {showConsent && (
+        <ConsentGate
+          onAgree={handleConsentAgree}
+          onDisagree={handleConsentDisagree}
+        />
+      )}
 
       {confirmPanel && (
         <ConfirmDocPanel
