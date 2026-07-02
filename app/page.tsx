@@ -14,6 +14,7 @@ import ConsentGate from '@/components/ConsentGate'
 import LawyerReviewEmailPanel from '@/components/LawyerReviewEmailPanel'
 import NameSearchPanel from '@/components/NameSearchPanel'
 import ReadAloudButton from '@/components/ReadAloudButton'
+import MicButton from '@/components/MicButton'
 import BeforeYouSignChecklist from '@/components/BeforeYouSignChecklist'
 
 // ── React Bits — SSR disabled (motion/react needs window) ────────────────────
@@ -958,6 +959,7 @@ export default function Home() {
                 disabled={isLoading}
                 style={{ flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', fontFamily: NEWSREADER, fontSize: 16, color: INK }}
               />
+              <MicButton value={draft} onChange={setDraft} disabled={isLoading} />
               <SendButton onClick={() => sendMessage(draft)} disabled={isLoading || !draft.trim()} />
             </div>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7, marginTop: 10, paddingLeft: 4 }}>
