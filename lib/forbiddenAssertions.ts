@@ -36,8 +36,38 @@ const FORBIDDEN_ASSERTION_PATTERNS: RegExp[] = [
 // testing, so word adjacency for detection purposes matches what a reader
 // actually sees, regardless of what formatting or punctuation sits between
 // the words.
+const CONFUSABLES: Record<string, string> = {
+  '\u0430': 'a',
+  '\u0410': 'A',
+  '\u0435': 'e',
+  '\u0415': 'E',
+  '\u03BF': 'o',
+  '\u039F': 'O',
+  '\u043E': 'o',
+  '\u041E': 'O',
+  '\u0441': 'c',
+  '\u0421': 'C',
+  '\u0456': 'i',
+  '\u0406': 'I',
+  '\u04CF': 'l',
+  '\u04C0': 'I',
+  '\u0443': 'y',
+  '\u0423': 'Y',
+  '\u0455': 's',
+  '\u0405': 'S',
+}
+
+function foldConfusables(text: string): string {
+  return text.replace(
+    /[\u039F\u03BF\u0405\u0406\u0410\u0415\u041E\u0421\u0423\u0430\u0435\u043E\u0441\u0443\u0455\u0456\u04C0\u04CF]/g,
+    (ch) => CONFUSABLES[ch] ?? ch,
+  )
+}
+
 function normalizeForDetection(text: string): string {
-  return text
+  return foldConfusables(text)
+    .normalize('NFKC')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
     .replace(/[*_`#]+/g, '')
     .replace(/[,;:—–-]+/g, ' ')
     .replace(/\s+/g, ' ')

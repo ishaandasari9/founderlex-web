@@ -58,6 +58,18 @@ const cases: Case[] = [
     run: () => containsForbiddenAssertion('It looks safe — to sign as written.') === true,
   },
   {
+    name: 'REGRESSION (Codex): containsForbiddenAssertion catches zero-width obfuscation inside a forbidden word',
+    run: () => containsForbiddenAssertion('You can saf\u200Bely sign this.') === true,
+  },
+  {
+    name: 'REGRESSION (Codex): containsForbiddenAssertion catches full-width unicode compatibility characters',
+    run: () => containsForbiddenAssertion('You can ｓａｆｅｌｙ sign this.') === true,
+  },
+  {
+    name: 'REGRESSION (Codex): containsForbiddenAssertion catches Cyrillic homoglyphs inside a forbidden word',
+    run: () => containsForbiddenAssertion('You can \u0455\u0430f\u0435l\u0443 sign this.') === true,
+  },
+  {
     name: 'REGRESSION (Codex): finalizeExplanation replaces the whole reply when the forbidden phrase only appears after markdown is present in the raw model output',
     run: () => {
       const raw = `${GOOD_EXPLANATION}\n\nOverall, you can **safely** sign this.`
