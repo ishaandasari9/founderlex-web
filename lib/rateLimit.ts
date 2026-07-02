@@ -1,6 +1,8 @@
 import 'server-only'
 import { supabaseAdmin } from './supabase'
 
+export { getClientIp } from './clientIp'
+
 function errorMessage(err: unknown): string {
   if (err instanceof Error) return err.message
   if (err && typeof err === 'object' && 'message' in err) return String((err as { message: unknown }).message)
@@ -30,10 +32,4 @@ export async function checkRateLimit(identifier: string, limit: number, windowSe
     console.error('[rateLimit] check failed, allowing request through:', errorMessage(err))
     return true
   }
-}
-
-export function getClientIp(req: Request): string {
-  const xff = req.headers.get('x-forwarded-for')
-  if (xff) return xff.split(',')[0].trim()
-  return 'unknown'
 }
