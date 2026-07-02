@@ -12,6 +12,7 @@ import { buildLawyerReviewEmail, type GeneratedDoc } from '@/lib/lawyerReviewEma
 import ConfirmDocPanel, { type ConfirmPanelState } from '@/components/ConfirmDocPanel'
 import ConsentGate from '@/components/ConsentGate'
 import LawyerReviewEmailPanel from '@/components/LawyerReviewEmailPanel'
+import NameSearchPanel from '@/components/NameSearchPanel'
 import BeforeYouSignChecklist from '@/components/BeforeYouSignChecklist'
 
 // ── React Bits — SSR disabled (motion/react needs window) ────────────────────
@@ -385,6 +386,7 @@ export default function Home() {
   const [confirmPanel, setConfirmPanel]   = useState<ConfirmPanelState | null>(null)
   const [confirmGenerating, setConfirmGenerating] = useState(false)
   const [lawyerEmail, setLawyerEmail]     = useState<string | null>(null)
+  const [showNameSearch, setShowNameSearch] = useState(false)
   const [enterSignal, setEnterSignal]     = useState(0)
   const [exitSignal, setExitSignal]       = useState(0)
   const [doorBusy, setDoorBusy]           = useState(false)
@@ -845,6 +847,14 @@ export default function Home() {
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3F9D6A', flexShrink: 0 }} />
                 Here with you
               </span>
+              <button onClick={() => setShowNameSearch(true)}
+                className="chat-clear-btn"
+                style={{
+                  fontFamily: MONO, fontSize: 10, letterSpacing: '0.10em', textTransform: 'uppercase',
+                  color: RED, background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                }}>
+                Check a name
+              </button>
               {generatedDocs.length > 0 && (
                 <button onClick={handleOpenLawyerEmail}
                   className="chat-clear-btn"
@@ -980,6 +990,13 @@ export default function Home() {
           email={lawyerEmail}
           onChange={setLawyerEmail}
           onClose={handleCloseLawyerEmail}
+        />
+      )}
+
+      {showNameSearch && (
+        <NameSearchPanel
+          profile={profile}
+          onClose={() => setShowNameSearch(false)}
         />
       )}
     </div>
