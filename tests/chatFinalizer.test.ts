@@ -95,6 +95,45 @@ check(
   'flags Cyrillic "о" (looks like Latin "o") in "covered"',
 )
 
+// REQUIRED (Codex re-review, High #3, EC-08): the dash-to-comma formatting
+// step corrupted a numeric dollar range written with the typographically-
+// correct en dash — "$45–65" became "$45, 65", reproducible every time,
+// not model variance. A digit-dash-digit span must become a hyphenated
+// range instead of falling through to the general comma replacement.
+const MALFORMED_RANGE = /\$\d+,\s*\d+\b/
+check(
+  !MALFORMED_RANGE.test(finalizeChatResponse('Registration is cheap, $45–65, and worth doing.')),
+  'REQUIRED (Codex): "$45–65" (en dash) does not become the malformed "$45, 65"',
+)
+check(
+  finalizeChatResponse('Registration is cheap, $45–65, and worth doing.').includes('$45-65'),
+  'REQUIRED (Codex): "$45–65" becomes the correctly hyphenated "$45-65"',
+)
+check(
+  !MALFORMED_RANGE.test(finalizeChatResponse('It typically costs $50—500 depending on the state.')),
+  'the same fix applies to an em-dash range ("$50—500")',
+)
+check(
+  finalizeChatResponse('It typically costs $50—500 depending on the state.').includes('$50-500'),
+  'the em-dash range becomes the correctly hyphenated "$50-500"',
+)
+check(
+  finalizeChatResponse('Filing fees run $250–$600 depending on the form.').includes('$250-$600'),
+  'a range with a dollar sign on both numbers is also preserved correctly ("$250-$600")',
+)
+check(
+  !MALFORMED_RANGE.test(
+    finalizeChatResponse(
+      "Copyright is automatic, but you generally can't sue for infringement unless you register it first at copyright.gov (cheap, $45–65), and that's especially important for your codebase.",
+    ),
+  ),
+  'REQUIRED (Codex): the exact reported sentence no longer produces a malformed dollar range',
+)
+check(
+  finalizeChatResponse('Let the founders decide — it is their choice.') === 'Let the founders decide, it is their choice.',
+  'an ordinary sentence-level em dash (not between numbers) still becomes a comma, unchanged behavior',
+)
+
 // Existing shared patterns, proven to run through this NEW entry point too
 // (proves reuse, not just presence of the shared module).
 check(

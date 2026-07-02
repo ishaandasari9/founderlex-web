@@ -75,8 +75,18 @@ export function isCannedSafeResponse(text: string): boolean {
 // runtime verifier (which needs the same display-ready text a reader would
 // see) and finalizeChatResponse (layer 4, below) share one implementation.
 // Idempotent: safe to call again on already-formatted text.
+//
+// Codex re-review (High, EC-08): the dash-to-comma replacement below is
+// meant for a sentence-level em/en dash pause ("text — more text" ->
+// "text, more text"), but a model writing a numeric range with the
+// typographically-correct en dash ("$45–65") got the SAME blind treatment,
+// corrupting it into "$45, 65" — reproducible every time the model phrases
+// a range that way, not model variance. A digit-dash-digit span is
+// converted to a plain hyphen FIRST, before the general replacement runs,
+// so "$45–65" becomes "$45-65" instead.
 function formatChatText(raw: string): string {
   return raw
+    .replace(/(\d)\s*[—–]\s*(\$?\d)/g, '$1-$2')
     .replace(/\s*—\s*/g, ', ')
     .replace(/\s*–\s*/g, ', ')
     .replace(/\*\*(.+?)\*\*/g, '$1')
