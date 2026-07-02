@@ -36,8 +36,16 @@ export async function POST(req: Request) {
       )
     }
 
-    const body = (await req.json()) as {
-      businessType?: string
+    const body = (await req.json()) as unknown
+
+    // Reject bodies that aren't a plain JSON object (null, arrays, primitives)
+    // with a 400 rather than letting a property access throw a 500 downstream.
+    if (body === null || typeof body !== 'object' || Array.isArray(body)) {
+      return NextResponse.json({ error: 'Request body must be a JSON object.' }, { status: 400 })
+    }
+
+    const { businessType: rawBusinessType, situations: rawSituations } = body as {
+      businessType?: unknown
       situations?: unknown
     }
 
@@ -46,12 +54,13 @@ export async function POST(req: Request) {
     // tags are honored, so a malformed request can't smuggle in unexpected
     // filtering behavior.
     const businessType =
-      body.businessType && VALID_BUSINESS_TYPES.includes(body.businessType as BusinessType)
-        ? (body.businessType as BusinessType)
+      typeof rawBusinessType === 'string' &&
+      VALID_BUSINESS_TYPES.includes(rawBusinessType as BusinessType)
+        ? (rawBusinessType as BusinessType)
         : null
 
-    const situations = Array.isArray(body.situations)
-      ? (body.situations.filter(
+    const situations = Array.isArray(rawSituations)
+      ? (rawSituations.filter(
           (s): s is Situation => typeof s === 'string' && VALID_SITUATIONS.includes(s as Situation),
         ) as Situation[])
       : []

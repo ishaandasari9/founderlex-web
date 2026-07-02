@@ -85,7 +85,7 @@ const DEADLINES: Deadline[] = [
     id: 'form_990',
     title: 'Annual nonprofit return (Form 990 / 990-EZ / 990-N)',
     typicalWindow:
-      'Typically due by the 15th day of the 5th month after the end of the organization’s fiscal year (for a calendar-year nonprofit, that is around May 15).',
+      'Typically due by the 15th day of the 5th month after the end of the organization’s fiscal year. For example, an organization whose fiscal year ends December 31 would look at a window around mid-May — but your own fiscal year, not this example, determines the date.',
     whatItIs:
       'The annual information return most tax-exempt organizations file with the IRS.',
     whyItMatters:
@@ -110,7 +110,7 @@ const DEADLINES: Deadline[] = [
     id: 'delaware_franchise_tax',
     title: 'Delaware franchise tax & annual report',
     typicalWindow:
-      'For Delaware corporations, the annual franchise tax and report are typically due by March 1 each year (LLCs follow a different schedule and amount).',
+      'For Delaware corporations, the annual franchise tax and report are typically due by March 1 — a fixed date the state sets for all corporations, not one tied to your own fiscal year (Delaware LLCs follow a different schedule and amount).',
     whatItIs:
       'An annual fee and report Delaware requires to keep an entity in good standing — separate from income tax.',
     whyItMatters:
@@ -135,7 +135,7 @@ const DEADLINES: Deadline[] = [
     id: 'federal_income_tax_return',
     title: 'Federal income tax return',
     typicalWindow:
-      'For calendar-year C-corporations, Form 1120 is generally due around April 15; pass-through entities such as partnerships and S-corporations generally file around March 15. Extensions are usually available but do not extend the time to pay.',
+      'The due date depends on the entity type and fiscal year. As a common example, a calendar-year C-corporation’s Form 1120 generally falls around mid-April, while calendar-year partnerships and S-corporations generally fall about a month earlier — but your entity type and fiscal year, not this example, set the actual date. Extensions are usually available but do not extend the time to pay.',
     whatItIs:
       'The annual federal income tax return for the business entity.',
     whyItMatters:
@@ -172,12 +172,12 @@ const DEADLINES: Deadline[] = [
     id: 'boi_report',
     title: 'Beneficial Ownership Information (BOI) report',
     typicalWindow:
-      'The federal Corporate Transparency Act created a BOI reporting requirement, but its scope, deadlines, and whether it applies to domestic companies have changed repeatedly through court rulings and rulemaking. Do not rely on any single remembered deadline here.',
+      'For companies created in the United States, there is currently no BOI report to file — under an interim final rule, domestic companies and U.S. persons were exempted from the reporting requirement. Only certain companies formed outside the U.S. and registered to do business here still report. This requirement has swung back and forth through litigation and rulemaking, and a further final rule is still expected, so treat the current status as subject to change.',
     whatItIs:
-      'A report identifying a company’s beneficial owners, filed with FinCEN (the Treasury’s Financial Crimes Enforcement Network).',
+      'A report identifying a company’s beneficial owners, filed with FinCEN (the Treasury’s Financial Crimes Enforcement Network) under the Corporate Transparency Act. FinCEN’s interim final rule (issued in March 2025) narrowed the definition of a “reporting company” to certain foreign-formed entities only.',
     whyItMatters:
-      'When it applies, missing it can carry significant penalties — but because the requirement has been in legal flux, confirming the current status is more important than any specific date.',
-    verifyAt: 'fincen.gov/boi and a business attorney (the rules here change often)',
+      'Because this requirement has repeatedly changed — and domestic companies are, for now, exempt — the important move is not memorizing a deadline but confirming the current status directly before assuming you do or do not have to file.',
+    verifyAt: 'fincen.gov/boi and a business attorney (this requirement has changed repeatedly)',
     appliesTo: ['product', 'consulting'],
   },
 ]
@@ -221,7 +221,11 @@ export function selectDeadlines(
   return { deadlines: matches, disclaimer: DEADLINE_DISCLAIMER }
 }
 
-// Convenience for surfaces that want a single count or a stable ordering.
+// Convenience for tests, counts, and stable orderings. NOTE: this returns the
+// raw dataset WITHOUT the mandated educational disclaimer. Any user-facing
+// surface must render deadlines via selectDeadlines() (which always attaches
+// DEADLINE_DISCLAIMER) or explicitly render DEADLINE_DISCLAIMER alongside the
+// list — never ship allDeadlines() output to a user on its own.
 export function allDeadlines(): Deadline[] {
   return DEADLINES
 }

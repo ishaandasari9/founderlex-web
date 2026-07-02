@@ -113,10 +113,15 @@ const cases: Case[] = [
       ),
   },
   {
-    name: 'BOI entry explicitly flags that the rule has been in flux',
+    name: 'BOI entry says domestic companies are currently exempt and flags ongoing change',
     run: () => {
       const boi = allDeadlines().find((d) => d.id === 'boi_report')
-      return !!boi && /flux|change|court/i.test(boi.typicalWindow + ' ' + boi.verifyAt)
+      if (!boi) return false
+      const text = `${boi.typicalWindow} ${boi.whatItIs} ${boi.whyItMatters} ${boi.verifyAt}`
+      return (
+        /exempt|no BOI report to file/i.test(text) &&
+        /change|flux|subject to change|expected/i.test(text)
+      )
     },
   },
   {
