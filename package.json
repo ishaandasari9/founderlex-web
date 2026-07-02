@@ -43,7 +43,8 @@
     "test:reference-content": "npx tsx tests/referenceContent.test.ts",
     "test:verifier-prompt-tuning": "npx tsx tests/verifierPromptTuning.test.ts",
     "test:generate-document": "npx tsx tests/generateDocument.test.ts",
-    "test:template-meta": "npx tsx tests/templateMeta.test.ts"
+    "test:template-meta": "npx tsx tests/templateMeta.test.ts",
+    "test:founder-pack": "npx tsx tests/founderPack.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",
