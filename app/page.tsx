@@ -15,6 +15,7 @@ import LawyerReviewEmailPanel from '@/components/LawyerReviewEmailPanel'
 import NameSearchPanel from '@/components/NameSearchPanel'
 import ReadAloudButton from '@/components/ReadAloudButton'
 import MicButton from '@/components/MicButton'
+import ExplainFormPanel from '@/components/ExplainFormPanel'
 import BeforeYouSignChecklist from '@/components/BeforeYouSignChecklist'
 
 // ── React Bits — SSR disabled (motion/react needs window) ────────────────────
@@ -389,6 +390,7 @@ export default function Home() {
   const [confirmGenerating, setConfirmGenerating] = useState(false)
   const [lawyerEmail, setLawyerEmail]     = useState<string | null>(null)
   const [showNameSearch, setShowNameSearch] = useState(false)
+  const [showExplainForm, setShowExplainForm] = useState(false)
   const [enterSignal, setEnterSignal]     = useState(0)
   const [exitSignal, setExitSignal]       = useState(0)
   const [doorBusy, setDoorBusy]           = useState(false)
@@ -849,6 +851,14 @@ export default function Home() {
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3F9D6A', flexShrink: 0 }} />
                 Here with you
               </span>
+              <button onClick={() => setShowExplainForm(true)}
+                className="chat-clear-btn"
+                style={{
+                  fontFamily: MONO, fontSize: 10, letterSpacing: '0.10em', textTransform: 'uppercase',
+                  color: RED, background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                }}>
+                Explain a form
+              </button>
               <button onClick={() => setShowNameSearch(true)}
                 className="chat-clear-btn"
                 style={{
@@ -1003,6 +1013,10 @@ export default function Home() {
           profile={profile}
           onClose={() => setShowNameSearch(false)}
         />
+      )}
+
+      {showExplainForm && (
+        <ExplainFormPanel onClose={() => setShowExplainForm(false)} />
       )}
     </div>
   )

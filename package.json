@@ -15,7 +15,8 @@
     "test:checklist": "npx tsx tests/beforeYouSignChecklist.test.ts",
     "test:name-search": "npx tsx tests/nameSearch.test.ts",
     "test:speech": "npx tsx tests/speech.test.ts",
-    "test:dictation": "npx tsx tests/speechRecognition.test.ts"
+    "test:dictation": "npx tsx tests/speechRecognition.test.ts",
+    "test:explain": "npx tsx tests/explainForm.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",

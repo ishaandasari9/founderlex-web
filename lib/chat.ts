@@ -11,7 +11,7 @@ function getClient() {
 
 let cachedPrompt: string | null = null
 
-function getSystemPrompt(): string {
+export function getSystemPrompt(): string {
   if (cachedPrompt) return cachedPrompt
   try {
     const path = join(process.cwd(), 'skill', 'SKILL.md')
