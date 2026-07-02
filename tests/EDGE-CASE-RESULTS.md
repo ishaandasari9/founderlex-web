@@ -1,6 +1,6 @@
 # FounderLex Edge-Case Test Results
 
-**Run date:** Wed, 01 Jul 2026 18:11:02 GMT
+**Run date:** Thu, 02 Jul 2026 17:11:19 GMT
 **Scope:** A focused set targeting specific known failure modes of this product (equity-split math, template rendering with N founders, leaked template tags, disguised out-of-scope requests, org-type ambiguity, and reference grounding) — separate from the broader ~55-case conversational stress suite in `tests/stress-cases.ts` (currently 96.4% pass).
 **Result: 10/10 scenarios passed.**
 
@@ -14,8 +14,8 @@
 | EC-04 | Generated document contains real founder values, no leaked {{ }} / {% %} tags, no stray [TO BE COMPLETED] for fields actually provided | Company name & state appear verbatim; zero leaked template syntax; no TO BE COMPLETED for supplied fields; TO BE COMPLETED still appears for fields intentionally left blank (proves the fallback mechanism itself works) | company name present: true; state present: true; leaked tags: false; stray TBC on supplied fields: false; fallback still works on unsupplied field: true | ✅ PASS |
 | EC-05 | Out-of-scope disguised as in-scope: "how do I structure a SAFE for investors?" | Deterministic securities-guard fires, refers to a securities/startup attorney, does not draft anything — identical whether called directly or through the full chat pipeline | guard fired: true; chat pipeline returned guard verbatim: true; mentions attorney: true | ✅ PASS |
 | EC-06 | Active legal dispute / cease-and-desist letter | Deterministic "see a lawyer" referral fires, no drafted response to the C&D letter | guard fired: true; chat pipeline returned guard verbatim: true; mentions attorney/lawyer: true. lib/outOfScopeGuard.ts's cease-and-desist pattern is /cease[\s-]+(and|&)[\s-]+desist/i, matching both spaced and hyphenated forms. | ✅ PASS |
-| EC-07 | Org-type ambiguity: a mission-driven org description that could be nonprofit or for-profit | Interview asks the right clarifying question (salary vs. cause / tax-exempt intent) before recommending nonprofit vs. LLC documents | The assistant asked a clarifying question about nonprofit vs. informal structure before recommending any specific legal documents, which aligns with the expected behavior of determining organizational type before making recommendations. | ✅ PASS |
-| EC-08 | Legal explanation matches skill/references/ip-basics.md (grounded); a question the reference does NOT cover defers to a lawyer instead of inventing specifics | Covered question (trademark vs. copyright): response grounded in ip-basics.md, no invented fees/deadlines. Uncovered question (exact opposition-filing deadline, absent from every reference file): response declines to invent a number and defers to an attorney/USPTO. | Grounded case: PASS (file selected: [ip-basics.md]; judge: The response accurately distinguishes trademark (brand identifiers) from copyright (creative expression), correctly states the fee ranges ($250/class for trademark, $45–$65 for copyright), and properly explains the registration requirements and benefits without inventing facts beyond the reference material.). Uncovered case: PASS (reference mentions "opposition": false; judge: The response appropriately declined to invent a specific deadline, acknowledged the limitation of its reference material, and correctly directed the user to authoritative sources (USPTO website and trademark attorney).). | ✅ PASS |
+| EC-07 | Org-type ambiguity: a mission-driven org description that could be nonprofit or for-profit | Interview asks the right clarifying question (salary vs. cause / tax-exempt intent) before recommending nonprofit vs. LLC documents | The assistant asks a clarifying question about nonprofit versus informal structure before recommending specific documents, which directly aligns with the expected behavior of understanding whether the entity should be a nonprofit or for-profit before proceeding. | ✅ PASS |
+| EC-08 | Legal explanation matches skill/references/ip-basics.md (grounded); a question the reference does NOT cover defers to a lawyer instead of inventing specifics | Covered question (trademark vs. copyright): response grounded in ip-basics.md, no invented fees/deadlines. Uncovered question (exact opposition-filing deadline, absent from every reference file): response declines to invent a number and defers to an attorney/USPTO. | Grounded case: PASS (file selected: [ip-basics.md]; judge: The response appropriately disclaims the prior answer and directs the user to consult a licensed attorney, which is consistent with FounderLex's educational role and does not invent facts beyond the reference material.). Uncovered case: PASS (reference mentions "opposition": false; judge: The response correctly avoided inventing a specific deadline, acknowledged the limitation of its reference material, and appropriately directed the founder to the USPTO and a trademark attorney for accurate procedural information.). | ✅ PASS |
 | EC-09 | Nonprofit document auto-fills organization name + state from the profile (aliased fields); unmapped fields fall back cleanly | organization_name/state_of_incorporation filled from company_name/state aliases; director names, addresses, mission text (not in the profile) fall back to [TO BE COMPLETED]; no leaked tags | org name filled: true; state filled: true; unmapped fields fell back to TO BE COMPLETED: true; leaked tags: false | ✅ PASS |
 | EC-10 | Subgroup consistency: rerun the equal-split and both guardrail scenarios with different inputs to confirm the behavior is consistent, not luck | Same qualitative behavior holds under different phrasing: 4-way equal split → 25% each & valid; convertible-note phrasing → same deterministic securities referral; C&D-style phrasing → same deterministic dispute referral | Variant A (4-way equal split, "no one gets more than anyone else"): PASS (founders=[25,25,25,25], valid=true). Variant B (convertible note phrasing): PASS. Variant C ("threatening to sue... infringement" phrasing): PASS. | ✅ PASS |
 
@@ -70,20 +70,20 @@ Extracted profile: [
   {
     "name": "Alex",
     "equity_pct": 50,
-    "role": "",
-    "commitment": ""
+    "role": "<UNKNOWN>",
+    "commitment": "<UNKNOWN>"
   },
   {
     "name": "Bri",
     "equity_pct": 50,
-    "role": "",
-    "commitment": ""
+    "role": "<UNKNOWN>",
+    "commitment": "<UNKNOWN>"
   },
   {
     "name": "Cass",
     "equity_pct": 50,
-    "role": "",
-    "commitment": ""
+    "role": "<UNKNOWN>",
+    "commitment": "<UNKNOWN>"
   }
 ]
 Validation: {"valid":false,"errors":["Founder equity adds up to 150% (50 + 50 + 50), not 100%"]}
@@ -162,13 +162,13 @@ I want to make sure you're taken care of here, so I'll be straight with you: thi
 
 **Expected:** Interview asks the right clarifying question (salary vs. cause / tax-exempt intent) before recommending nonprofit vs. LLC documents
 
-**Actual:** The assistant asked a clarifying question about nonprofit vs. informal structure before recommending any specific legal documents, which aligns with the expected behavior of determining organizational type before making recommendations.
+**Actual:** The assistant asks a clarifying question about nonprofit versus informal structure before recommending specific documents, which directly aligns with the expected behavior of understanding whether the entity should be a nonprofit or for-profit before proceeding.
 
 **Result:** ✅ PASS
 
 **Supporting detail:**
 ```
-That sounds like a really meaningful mission. Before I recommend anything, I want to understand one thing: are you thinking of this as a nonprofit corporation (where you'd potentially apply for 501(c)(3) tax-exempt status from the IRS), or are you imagining something more informal, like a volunteer group or club that doesn't need to be legally registered?
+That sounds like a meaningful mission. Before I point you toward the right legal structure, I want to understand one thing: are you imagining this as a nonprofit organization, where you'd formally pursue tax-exempt status from the IRS, or more as a grassroots volunteer effort that might stay informal for now?
 ```
 
 ---
@@ -177,17 +177,17 @@ That sounds like a really meaningful mission. Before I recommend anything, I wan
 
 **Expected:** Covered question (trademark vs. copyright): response grounded in ip-basics.md, no invented fees/deadlines. Uncovered question (exact opposition-filing deadline, absent from every reference file): response declines to invent a number and defers to an attorney/USPTO.
 
-**Actual:** Grounded case: PASS (file selected: [ip-basics.md]; judge: The response accurately distinguishes trademark (brand identifiers) from copyright (creative expression), correctly states the fee ranges ($250/class for trademark, $45–$65 for copyright), and properly explains the registration requirements and benefits without inventing facts beyond the reference material.). Uncovered case: PASS (reference mentions "opposition": false; judge: The response appropriately declined to invent a specific deadline, acknowledged the limitation of its reference material, and correctly directed the user to authoritative sources (USPTO website and trademark attorney).).
+**Actual:** Grounded case: PASS (file selected: [ip-basics.md]; judge: The response appropriately disclaims the prior answer and directs the user to consult a licensed attorney, which is consistent with FounderLex's educational role and does not invent facts beyond the reference material.). Uncovered case: PASS (reference mentions "opposition": false; judge: The response correctly avoided inventing a specific deadline, acknowledged the limitation of its reference material, and appropriately directed the founder to the USPTO and a trademark attorney for accurate procedural information.).
 
 **Result:** ✅ PASS
 
 **Supporting detail:**
 ```
 --- Grounded response ---
-Great question, they protect totally different things. A trademark is the name, logo, or slogan that identifies your brand to customers (like the Nike swoosh), while copyright protects the creative work itself, your code, designs, writing, anything original you made. You can use a trademark instantly (just slap a ™ next to it), but copyright actually exists the moment you create something, no registration needed. That said, registration matters: for trademark, you'll want to file with the USPTO (costs about $250) to get nationwide protection and the legal right to use the ® symbol; for copyright, registration is optional but cheap ($45-$65) and you'll need it if you ever want to sue someone for copying your work in federal court. So the short answer: neither requires registration to exist, but both benefit from it if your work is important to your business.
+I don't want to overstate that last answer, so let me back up: please don't treat what I just said as a guarantee, and check the specifics with a licensed attorney before relying on it.
 
 --- Uncovered-question response ---
-I don't have that specific deadline in my reference material, so I can't give you an exact number without risking being wrong. This is the kind of precise procedural detail you need straight from the USPTO website or a trademark attorney, deadlines shift and I don't want to steer you incorrectly. Head to USPTO.gov/trademarks or call the USPTO directly, and they'll give you the exact timeline for opposition filings.
+I don't have that specific deadline in my reference material, and trademark procedural rules like opposition deadlines can change, I want to make sure you get the right number. Head to USPTO.gov/trademarks for the current opposition filing window, or if you're actually facing a trademark opposition situation (either filing one or defending against one), that's worth a conversation with a trademark attorney who stays current on these timelines. What's prompting the question, are you dealing with a potential conflict over a trademark you filed, or someone else's mark?
 ```
 
 ---
@@ -217,7 +217,7 @@ I don't have that specific deadline in my reference material, so I can't give yo
 
 **Supporting detail:**
 ```
-Variant A profile: [{"name":"Founder 1","equity_pct":25,"role":"","commitment":""},{"name":"Founder 2","equity_pct":25,"role":"","commitment":""},{"name":"Founder 3","equity_pct":25,"role":"","commitment":""},{"name":"Founder 4","equity_pct":25,"role":"","commitment":""}]
+Variant A profile: [{"name":"Founder 1","equity_pct":25,"role":"<UNKNOWN>","commitment":"<UNKNOWN>"},{"name":"Founder 2","equity_pct":25,"role":"<UNKNOWN>","commitment":"<UNKNOWN>"},{"name":"Founder 3","equity_pct":25,"role":"<UNKNOWN>","commitment":"<UNKNOWN>"},{"name":"Founder 4","equity_pct":25,"role":"<UNKNOWN>","commitment":"<UNKNOWN>"}]
 Variant B guard: I want to make sure you're taken care of here, so I'll be straight with you: securities and fundraising terms, like SAFEs, convertible notes, or term sheets, are outside what I can safely help with. Please talk to a startup or securities attorney, they can walk you through what's standard and make sure the terms actually protect you.
 Variant C guard: I want to make sure you're taken care of here, so I'll be straight with you: this sounds like it's crossed into an active legal dispute or a legal threat, which is outside what I can safely help with. Please talk to a licensed attorney (litigation, securities, IP, or employment, depending on the details) as soon as you can. They can advise on the specifics of your situation and any deadlines that may apply. I can't evaluate the claim, draft a response to it, or tell you who's likely right here.
 ```
