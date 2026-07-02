@@ -54,18 +54,24 @@ const cases: Case[] = [
     },
   },
   {
-    name: 'core_documents is done only when all recommended docs are confirmed',
+    name: 'core_documents is done only when all recommended docs are confirmed (with prior steps done)',
     run: () => {
+      const base = {
+        business_type: 'product' as const,
+        product_description: 'A budgeting app',
+        structure: 'LLC',
+        registered: true,
+      }
       const notDone = buildRoadmap(
         profile({
-          business_type: 'product',
+          ...base,
           recommended_documents: ['founders_agreement', 'mutual_nda'],
           confirmed_documents: ['founders_agreement'],
         }),
       )
       const done = buildRoadmap(
         profile({
-          business_type: 'product',
+          ...base,
           recommended_documents: ['founders_agreement', 'mutual_nda'],
           confirmed_documents: ['founders_agreement', 'mutual_nda'],
         }),
@@ -73,6 +79,37 @@ const cases: Case[] = [
       return (
         stepById(notDone, 'core_documents')?.status !== 'done' &&
         stepById(done, 'core_documents')?.status === 'done'
+      )
+    },
+  },
+  {
+    name: 'done-status is monotonic: a later satisfied step is not "done" while an earlier step is unfinished',
+    run: () => {
+      // registered=true but no structure recorded and no concept described:
+      // the register step must NOT show done ahead of the earlier steps.
+      const r = buildRoadmap(profile({ business_type: 'product', registered: true }))
+      return (
+        stepById(r, 'register_with_state')?.status !== 'done' &&
+        stepById(r, 'clarify_concept')?.status === 'current'
+      )
+    },
+  },
+  {
+    name: 'ROBUSTNESS: a malformed persisted profile (wrong types) does not crash and yields a sane roadmap',
+    run: () => {
+      const malformed = {
+        business_type: 'nonprofit',
+        confirmed_documents: 123,
+        recommended_documents: 'not-an-array',
+        registered: 'yes',
+        product_description: 42,
+      } as unknown as FounderProfile
+      const r = buildRoadmap(malformed)
+      // confirmed_documents coerced to [], so governance is not marked done.
+      return (
+        r.steps.length > 0 &&
+        r.disclaimer === ROADMAP_DISCLAIMER &&
+        stepById(r, 'governance_documents')?.status !== 'done'
       )
     },
   },
@@ -89,14 +126,19 @@ const cases: Case[] = [
     },
   },
   {
-    name: 'nonprofit governance step is done only with both bylaws and conflict-of-interest confirmed',
+    name: 'nonprofit governance step is done only with both bylaws and conflict-of-interest confirmed (prior steps done)',
     run: () => {
+      const base = {
+        business_type: 'nonprofit' as const,
+        product_description: 'A literacy nonprofit',
+        registered: true,
+      }
       const partial = buildRoadmap(
-        profile({ business_type: 'nonprofit', confirmed_documents: ['nonprofit_bylaws'] }),
+        profile({ ...base, confirmed_documents: ['nonprofit_bylaws'] }),
       )
       const full = buildRoadmap(
         profile({
-          business_type: 'nonprofit',
+          ...base,
           confirmed_documents: ['nonprofit_bylaws', 'nonprofit_conflict_of_interest'],
         }),
       )

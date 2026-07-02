@@ -234,24 +234,37 @@ function trackFor(businessType: FounderProfile['business_type']): {
 }
 
 // Pure function of the profile. A null profile is treated as an empty one so a
-// brand-new visitor still gets the starting roadmap rather than nothing.
+// brand-new visitor still gets the starting roadmap rather than nothing. The
+// profile is coerced to a known shape first (Codex finding): it comes from
+// persisted session storage, which is only size-validated on save, so a
+// malformed stored profile (e.g. confirmed_documents that isn't an array)
+// must not be able to crash roadmap generation.
 export function buildRoadmap(profile: FounderProfile | null): Roadmap {
-  const p: FounderProfile = profile ?? emptyLike()
+  const p = coerceProfile(profile)
   const { trackable, ongoing } = trackFor(p.business_type)
 
-  const doneFlags = trackable.map((s) => s.done(p))
-  const doneCount = doneFlags.filter(Boolean).length
+  // Done-status is monotonic: a step only counts as done when it AND every
+  // earlier step are satisfied (Codex Low finding). This models a roadmap the
+  // way a founder actually reads one — you can't be past step 3 while step 2 is
+  // unfinished — and avoids an internally inconsistent profile (registered=true
+  // but no structure recorded) showing a later milestone as complete while an
+  // earlier one is still current.
+  const rawDone = trackable.map((s) => s.done(p))
+  const effectiveDone: boolean[] = []
+  let prefixOk = true
+  for (let i = 0; i < trackable.length; i++) {
+    prefixOk = prefixOk && rawDone[i]
+    effectiveDone.push(prefixOk)
+  }
+  const doneCount = effectiveDone.filter(Boolean).length
 
-  // Each step's own predicate decides done vs. not; the earliest not-done step
-  // is promoted to "current" so inconsistent profiles (e.g. registered=true but
-  // no structure recorded) still show a sensible single pointer.
-  const firstNotDone = doneFlags.findIndex((d) => !d)
+  const firstNotDone = effectiveDone.findIndex((d) => !d)
   const steps: RoadmapStep[] = trackable.map((s, i) => ({
     id: s.id,
     title: s.title,
     whatItIs: s.whatItIs,
     nextAction: s.nextAction,
-    status: doneFlags[i] ? 'done' : i === firstNotDone ? 'current' : 'upcoming',
+    status: effectiveDone[i] ? 'done' : i === firstNotDone ? 'current' : 'upcoming',
   }))
 
   for (const o of ongoing) {
@@ -280,19 +293,42 @@ function buildHeadline(doneCount: number, total: number): string {
   return `You’ve completed ${doneCount} of ${total} core setup steps the tool can track. Here’s what’s next.`
 }
 
-function emptyLike(): FounderProfile {
+const BUSINESS_TYPES: ReadonlyArray<string> = ['product', 'consulting', 'nonprofit']
+
+function asStringOrNull(v: unknown): string | null {
+  return typeof v === 'string' ? v : null
+}
+
+function asStringArray(v: unknown): string[] {
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []
+}
+
+function asBoolOrNull(v: unknown): boolean | null {
+  return typeof v === 'boolean' ? v : null
+}
+
+// Normalizes an untrusted/persisted profile into the exact shape buildRoadmap
+// relies on. Any field of the wrong type is coerced to a safe default, so a
+// malformed stored profile yields a sensible (possibly empty) roadmap rather
+// than throwing. A null profile becomes a fully-empty profile.
+function coerceProfile(profile: FounderProfile | null): FounderProfile {
+  const src = (profile ?? {}) as Partial<Record<keyof FounderProfile, unknown>>
+  const bt = src.business_type
   return {
-    company_name: null,
-    product_description: '',
-    business_type: null,
-    founders: [],
-    registered: null,
-    structure: null,
-    state: null,
-    handles_user_data: null,
-    has_ip: null,
-    taking_money_from: null,
-    recommended_documents: [],
-    confirmed_documents: [],
+    company_name: asStringOrNull(src.company_name),
+    product_description: typeof src.product_description === 'string' ? src.product_description : '',
+    business_type:
+      typeof bt === 'string' && BUSINESS_TYPES.includes(bt)
+        ? (bt as FounderProfile['business_type'])
+        : null,
+    founders: Array.isArray(src.founders) ? (src.founders as FounderProfile['founders']) : [],
+    registered: asBoolOrNull(src.registered),
+    structure: asStringOrNull(src.structure),
+    state: asStringOrNull(src.state),
+    handles_user_data: asBoolOrNull(src.handles_user_data),
+    has_ip: asBoolOrNull(src.has_ip),
+    taking_money_from: asStringOrNull(src.taking_money_from),
+    recommended_documents: asStringArray(src.recommended_documents),
+    confirmed_documents: asStringArray(src.confirmed_documents),
   }
 }

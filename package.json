@@ -30,7 +30,8 @@
     "test:deadlines": "npx tsx tests/deadlineReminders.test.ts",
     "test:cost-estimate": "npx tsx tests/costEstimator.test.ts",
     "test:compare": "npx tsx tests/compareDocuments.test.ts",
-    "test:roadmap": "npx tsx tests/foundingRoadmap.test.ts"
+    "test:roadmap": "npx tsx tests/foundingRoadmap.test.ts",
+    "test:session-id": "npx tsx tests/sessionId.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",
