@@ -6,6 +6,7 @@ import { extractProfile } from '@/lib/extractProfile'
 import { validateProfile, describeProfile, type FounderProfile } from '@/lib/founderProfile'
 import { selectReferenceFiles } from '@/lib/selectReferences'
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit'
+import { requireJsonContentType } from '@/lib/requestGuard'
 
 const CHAT_RATE_LIMIT = 20
 const CHAT_RATE_WINDOW_SECONDS = 60
@@ -28,6 +29,11 @@ function buildReferenceContext(files: string[]): string {
 
 export async function POST(req: Request) {
   try {
+    const contentTypeError = requireJsonContentType(req)
+    if (contentTypeError) {
+      return NextResponse.json({ error: contentTypeError }, { status: 415 })
+    }
+
     const ip = getClientIp(req)
     const allowed = await checkRateLimit(`chat:${ip}`, CHAT_RATE_LIMIT, CHAT_RATE_WINDOW_SECONDS)
     if (!allowed) {

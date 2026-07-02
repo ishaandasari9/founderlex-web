@@ -4,6 +4,7 @@ import { getSession, saveSession, deleteSession } from '@/lib/supabase'
 import type { FounderProfile } from '@/lib/founderProfile'
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit'
 import { validateSessionPayload } from '@/lib/sessionValidation'
+import { requireJsonContentType } from '@/lib/requestGuard'
 
 const SESSION_RATE_LIMIT = 30
 const SESSION_RATE_WINDOW_SECONDS = 60
@@ -41,6 +42,11 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
+    const contentTypeError = requireJsonContentType(req)
+    if (contentTypeError) {
+      return NextResponse.json({ error: contentTypeError }, { status: 415 })
+    }
+
     const limited = await enforceRateLimit(req)
     if (limited) return limited
 

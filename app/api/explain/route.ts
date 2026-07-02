@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { explainForm } from '@/lib/explainForm'
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit'
+import { requireJsonContentType } from '@/lib/requestGuard'
 
 const EXPLAIN_RATE_LIMIT = 8
 const EXPLAIN_RATE_WINDOW_SECONDS = 60
@@ -8,6 +9,11 @@ const MAX_INPUT_CHARS = 20000
 
 export async function POST(req: Request) {
   try {
+    const contentTypeError = requireJsonContentType(req)
+    if (contentTypeError) {
+      return NextResponse.json({ error: contentTypeError }, { status: 415 })
+    }
+
     const ip = getClientIp(req)
     const allowed = await checkRateLimit(`explain:${ip}`, EXPLAIN_RATE_LIMIT, EXPLAIN_RATE_WINDOW_SECONDS)
     if (!allowed) {

@@ -15,6 +15,7 @@ import { buildTemplateVars } from '@/lib/profileToTemplateVars'
 import { emptyProfile, type FounderProfile } from '@/lib/founderProfile'
 import { getRelevantFields } from '@/lib/confirmationFields'
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit'
+import { requireJsonContentType } from '@/lib/requestGuard'
 
 const GENERATE_RATE_LIMIT = 10
 const GENERATE_RATE_WINDOW_SECONDS = 60
@@ -162,6 +163,11 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
+    const contentTypeError = requireJsonContentType(req)
+    if (contentTypeError) {
+      return NextResponse.json({ error: contentTypeError }, { status: 415 })
+    }
+
     const limited = await enforceRateLimit(req)
     if (limited) return limited
 

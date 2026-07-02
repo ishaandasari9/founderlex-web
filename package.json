@@ -21,7 +21,8 @@
     "test:dictation-accumulator": "npx tsx tests/dictationAccumulator.test.ts",
     "test:client-ip": "npx tsx tests/clientIp.test.ts",
     "test:chat-input": "npx tsx tests/chatInputValidation.test.ts",
-    "test:session-validation": "npx tsx tests/sessionValidation.test.ts"
+    "test:session-validation": "npx tsx tests/sessionValidation.test.ts",
+    "test:request-guard": "npx tsx tests/requestGuard.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",
