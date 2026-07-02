@@ -41,7 +41,8 @@
     "test:citations": "npx tsx tests/citations.test.ts",
     "test:citation-routing": "npx tsx tests/citationRouting.test.ts",
     "test:reference-content": "npx tsx tests/referenceContent.test.ts",
-    "test:verifier-prompt-tuning": "npx tsx tests/verifierPromptTuning.test.ts"
+    "test:verifier-prompt-tuning": "npx tsx tests/verifierPromptTuning.test.ts",
+    "test:generate-document": "npx tsx tests/generateDocument.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",
