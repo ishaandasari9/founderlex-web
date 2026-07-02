@@ -34,7 +34,8 @@
     "test:session-id": "npx tsx tests/sessionId.test.ts",
     "test:accuracy-dataset": "npx tsx tests/accuracy-dataset.test.ts",
     "test:accuracy-scoring": "npx tsx tests/accuracyScoring.test.ts",
-    "test:accuracy": "npx tsx tests/accuracy-runner.ts"
+    "test:accuracy": "npx tsx tests/accuracy-runner.ts",
+    "test:chat-finalizer": "npx tsx tests/chatFinalizer.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",

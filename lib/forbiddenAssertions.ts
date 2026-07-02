@@ -41,6 +41,15 @@ const FORBIDDEN_ASSERTION_PATTERNS: RegExp[] = [
   /\bfree\s+to\s+(use|register)\s+(this|the)\s+name\b/i,
   /\byou\s+(can|could)\s+(safely\s+)?(use|register)\s+this\s+name\b/i,
   /\bapproved\s+(for|to)\s+(use|register(ation)?)\b/i,
+  // Overconfident-outcome language outside the signing/naming context
+  // (Codex audit, chat pipeline hardening): "you'll be fine" or "the wall
+  // holds up fine" assert a guaranteed legal outcome (e.g. that an LLC's
+  // liability shield will hold up) with no actual determination behind it —
+  // the same category of overclaim as the signing-verdict patterns above,
+  // just not phrased around "sign." Apostrophe made optional/curly-aware
+  // since chat output isn't guaranteed to use a straight ASCII apostrophe.
+  /\byou(?:'ll|’ll|\s+will)\s+be\s+(?:totally\s+|completely\s+)?fine\b/i,
+  /\bholds?\s+up\s+(?:just\s+)?fine\b/i,
 ]
 
 // A phrase split by markdown emphasis ("you can **safely** sign") or by

@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { detectOutOfScope } from './outOfScopeGuard'
+import { containsForbiddenAssertion } from './forbiddenAssertions'
 
 let _client: Anthropic | null = null
 function getClient() {
@@ -34,6 +35,37 @@ REPLY STYLE - follow these exactly, they override everything else:
 - If you need to name multiple things, weave them into a sentence naturally, not as a list.`
 
 export type ChatMessage = { role: 'user' | 'assistant'; content: string }
+
+// Shown in place of a reply that trips the forbidden-assertion backstop
+// below. Deliberately doesn't itself contain any risky "safe/fine/sign"
+// phrasing that could re-trigger the same check.
+const CHAT_SAFE_FALLBACK =
+  "I don't want to overstate that last answer, so let me back up: please don't treat what I just said as a guarantee, and check the specifics with a licensed attorney before relying on it."
+
+// Code-level backstop, independent of the system prompt: runs after every
+// substantive chat reply, before it's ever returned to a caller. Reuses the
+// shared containsForbiddenAssertion scan (also used by lib/explainForm.ts
+// and lib/redFlags.ts) rather than forking a second copy of the pattern
+// list, per Codex audit finding — a jailbreak or an unusual model phrasing
+// (e.g. "the wall usually holds up fine" for LLC liability) that implies a
+// guaranteed legal outcome must never reach the user, even if the system
+// prompt's instructions get talked around.
+//
+// The check runs on the fully formatted, display-ready text (markdown/dash
+// stripping already applied), matching lib/explainForm.ts's
+// finalizeExplanation convention: the check and what a reader actually sees
+// must be exactly the same string.
+export function finalizeChatResponse(raw: string): string {
+  const formatted = raw
+    .replace(/\s*—\s*/g, ', ')
+    .replace(/\s*–\s*/g, ', ')
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/\*(.+?)\*/g, '$1')
+    .replace(/^#+\s+/gm, '')
+
+  if (containsForbiddenAssertion(formatted)) return CHAT_SAFE_FALLBACK
+  return formatted
+}
 
 // Unlike /api/explain (which has an explicit 20k-char cap for a one-time
 // document paste), chat previously had no size limit at all — a single
@@ -128,10 +160,5 @@ export async function getChatResponse(
 
   const block = response.content[0]
   const raw = block.type === 'text' ? block.text : ''
-  return raw
-    .replace(/\s*—\s*/g, ', ')
-    .replace(/\s*–\s*/g, ', ')
-    .replace(/\*\*(.+?)\*\*/g, '$1')
-    .replace(/\*(.+?)\*/g, '$1')
-    .replace(/^#+\s+/gm, '')
+  return finalizeChatResponse(raw)
 }
