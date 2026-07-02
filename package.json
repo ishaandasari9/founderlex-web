@@ -33,6 +33,7 @@
     "test:roadmap": "npx tsx tests/foundingRoadmap.test.ts",
     "test:session-id": "npx tsx tests/sessionId.test.ts",
     "test:accuracy-dataset": "npx tsx tests/accuracy-dataset.test.ts",
+    "test:accuracy-scoring": "npx tsx tests/accuracyScoring.test.ts",
     "test:accuracy": "npx tsx tests/accuracy-runner.ts"
   },
   "dependencies": {

@@ -27,6 +27,7 @@ if (existsSync(envFile)) {
 import { getChatResponse, type ChatMessage } from '../lib/chat'
 import { selectReferenceFiles } from '../lib/selectReferences'
 import { ACCURACY_DATASET, type AccuracyCase } from './accuracy-dataset'
+import { computeExitCode } from './accuracyScoring'
 
 // ── Reference grounding context (mirrors app/api/chat/route.ts's local helper) ─
 const referenceCache = new Map<string, string>()
@@ -230,6 +231,15 @@ async function main() {
   const reportPath = join(process.cwd(), 'tests', 'ACCURACY-RESULTS.md')
   writeFileSync(reportPath, report, 'utf8')
   console.log(`Report written to: tests/ACCURACY-RESULTS.md`)
+
+  // Codex audit (High): this used to exit 0 unconditionally, so a real
+  // regression in the grounded (real-pipeline) results would silently pass.
+  // Fail the run on any grounded miss, so CI/terminal usage actually gates.
+  const exitCode = computeExitCode(results.map((r) => ({ in_scope: r.item.in_scope, pass: r.groundedVerdict.pass })))
+  if (exitCode !== 0) {
+    console.error(`\nFAILING: at least one grounded case did not pass, or a required threshold was missed. See tests/ACCURACY-RESULTS.md for details.`)
+  }
+  process.exit(exitCode)
 }
 
 main().catch((err) => {
