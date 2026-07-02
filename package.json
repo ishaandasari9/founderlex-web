@@ -11,7 +11,8 @@
     "test:edge-cases": "npx tsx tests/edge-case-runner.ts",
     "test:profile": "npx tsx tests/founderProfile.test.ts",
     "test:template": "npx tsx tests/renderTemplate.test.ts",
-    "test:lawyer-email": "npx tsx tests/lawyerReviewEmail.test.ts"
+    "test:lawyer-email": "npx tsx tests/lawyerReviewEmail.test.ts",
+    "test:checklist": "npx tsx tests/beforeYouSignChecklist.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",

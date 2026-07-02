@@ -12,6 +12,7 @@ import { buildLawyerReviewEmail, type GeneratedDoc } from '@/lib/lawyerReviewEma
 import ConfirmDocPanel, { type ConfirmPanelState } from '@/components/ConfirmDocPanel'
 import ConsentGate from '@/components/ConsentGate'
 import LawyerReviewEmailPanel from '@/components/LawyerReviewEmailPanel'
+import BeforeYouSignChecklist from '@/components/BeforeYouSignChecklist'
 
 // ── React Bits — SSR disabled (motion/react needs window) ────────────────────
 // Cast to any to bypass TypeScript inference quirks from .jsx component files
@@ -52,9 +53,10 @@ const DoorHero    = dynamic(() => import('../components/door/DoorHero'), {
 // ── Types ────────────────────────────────────────────────────────────────────
 type Act = 'door' | 'about' | 'chat'
 interface Msg {
-  role: 'user' | 'bot' | 'doc-card'
+  role: 'user' | 'bot' | 'doc-card' | 'checklist-card'
   text: string
   template?: string
+  filled?: string
   isLoading?: boolean
 }
 
@@ -516,20 +518,20 @@ export default function Home() {
     const result = await generateAndDownload(confirmPanel.template, effectiveProfile)
     setConfirmGenerating(false)
     if (result.ok) {
+      const label = TEMPLATE_LABELS[confirmPanel.template] ?? confirmPanel.template
+      const filled = result.filled ?? ''
       setDocCount(prev => prev + 1)
-      setGeneratedDocs(prev => [
-        ...prev,
-        {
-          template: confirmPanel.template,
-          label: TEMPLATE_LABELS[confirmPanel.template] ?? confirmPanel.template,
-          filled: result.filled ?? '',
-        },
-      ])
+      setGeneratedDocs(prev => [...prev, { template: confirmPanel.template, label, filled }])
+      setMessages(prev => {
+        const next: Msg[] = [...prev, { role: 'checklist-card', text: '', template: confirmPanel.template, filled }]
+        persistSession(next, profileRef.current)
+        return next
+      })
       setConfirmPanel(null)
     } else {
       alert(`Could not generate document: ${result.error ?? 'Unknown error'}`)
     }
-  }, [confirmPanel])
+  }, [confirmPanel, persistSession])
 
   const handleOpenLawyerEmail = useCallback(() => {
     setLawyerEmail(buildLawyerReviewEmail(profileRef.current ?? emptyProfile(), generatedDocs))
@@ -896,6 +898,17 @@ export default function Home() {
                       template={m.template}
                       onGenerate={() => handleOpenConfirm(m.template!)}
                       generating={generatingTpl === m.template}
+                    />
+                  </div>
+                )
+              }
+              if (m.role === 'checklist-card' && m.template) {
+                return (
+                  <div key={i} style={{ display: 'flex', paddingLeft: 39 }}>
+                    <BeforeYouSignChecklist
+                      template={m.template}
+                      label={TEMPLATE_LABELS[m.template] ?? m.template}
+                      filled={m.filled ?? ''}
                     />
                   </div>
                 )
