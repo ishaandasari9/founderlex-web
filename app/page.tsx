@@ -16,6 +16,10 @@ import NameSearchPanel from '@/components/NameSearchPanel'
 import ReadAloudButton from '@/components/ReadAloudButton'
 import MicButton from '@/components/MicButton'
 import ExplainFormPanel from '@/components/ExplainFormPanel'
+import DeadlinesPanel from '@/components/DeadlinesPanel'
+import CostEstimatePanel from '@/components/CostEstimatePanel'
+import ComparePanel from '@/components/ComparePanel'
+import RoadmapPanel from '@/components/RoadmapPanel'
 import RedFlagCard from '@/components/RedFlagCard'
 import { detectRedFlags, checkAssistantOverstep, type RedFlag } from '@/lib/redFlags'
 import BeforeYouSignChecklist from '@/components/BeforeYouSignChecklist'
@@ -394,6 +398,10 @@ export default function Home() {
   const [lawyerEmail, setLawyerEmail]     = useState<string | null>(null)
   const [showNameSearch, setShowNameSearch] = useState(false)
   const [showExplainForm, setShowExplainForm] = useState(false)
+  const [showDeadlines, setShowDeadlines] = useState(false)
+  const [showCostEstimate, setShowCostEstimate] = useState(false)
+  const [showCompare, setShowCompare] = useState(false)
+  const [showRoadmap, setShowRoadmap] = useState(false)
   const [enterSignal, setEnterSignal]     = useState(0)
   const [exitSignal, setExitSignal]       = useState(0)
   const [doorBusy, setDoorBusy]           = useState(false)
@@ -861,6 +869,38 @@ export default function Home() {
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3F9D6A', flexShrink: 0 }} />
                 Here with you
               </span>
+              <button onClick={() => setShowRoadmap(true)}
+                className="chat-clear-btn"
+                style={{
+                  fontFamily: MONO, fontSize: 10, letterSpacing: '0.10em', textTransform: 'uppercase',
+                  color: RED, background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                }}>
+                Your progress
+              </button>
+              <button onClick={() => setShowDeadlines(true)}
+                className="chat-clear-btn"
+                style={{
+                  fontFamily: MONO, fontSize: 10, letterSpacing: '0.10em', textTransform: 'uppercase',
+                  color: RED, background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                }}>
+                Deadlines
+              </button>
+              <button onClick={() => setShowCostEstimate(true)}
+                className="chat-clear-btn"
+                style={{
+                  fontFamily: MONO, fontSize: 10, letterSpacing: '0.10em', textTransform: 'uppercase',
+                  color: RED, background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                }}>
+                Cost & time
+              </button>
+              <button onClick={() => setShowCompare(true)}
+                className="chat-clear-btn"
+                style={{
+                  fontFamily: MONO, fontSize: 10, letterSpacing: '0.10em', textTransform: 'uppercase',
+                  color: RED, background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                }}>
+                Compare versions
+              </button>
               <button onClick={() => setShowExplainForm(true)}
                 className="chat-clear-btn"
                 style={{
@@ -1034,6 +1074,28 @@ export default function Home() {
 
       {showExplainForm && (
         <ExplainFormPanel onClose={() => setShowExplainForm(false)} />
+      )}
+
+      {showDeadlines && (
+        <DeadlinesPanel
+          profile={profile}
+          onClose={() => setShowDeadlines(false)}
+        />
+      )}
+
+      {showCostEstimate && (
+        <CostEstimatePanel
+          profile={profile}
+          onClose={() => setShowCostEstimate(false)}
+        />
+      )}
+
+      {showCompare && (
+        <ComparePanel onClose={() => setShowCompare(false)} />
+      )}
+
+      {showRoadmap && (
+        <RoadmapPanel onClose={() => setShowRoadmap(false)} />
       )}
     </div>
   )
