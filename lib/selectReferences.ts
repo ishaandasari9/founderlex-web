@@ -14,11 +14,19 @@ const TOPIC_RULES: TopicRule[] = [
   },
   {
     file: 'business-structures.md',
-    keywords: ['llc', 'c-corp', 'c corp', 's-corp', 's corp', 'sole proprietorship', 'partnership', 'incorporate', 'entity type', 'business structure'],
+    // 'venture capital' added (A1 accuracy benchmark, Codex audit): a founder
+    // asking what structure to use for a VC raise is exactly what this file
+    // covers ("the standard structure expected by venture capital
+    // investors"), but previously matched no keyword at all.
+    keywords: ['llc', 'c-corp', 'c corp', 's-corp', 's corp', 'sole proprietorship', 'partnership', 'incorporate', 'entity type', 'business structure', 'venture capital'],
   },
   {
     file: 'liability-basics.md',
-    keywords: ['liability', 'sued', 'lawsuit', 'personal assets', 'liable', 'piercing the corporate veil'],
+    // 'in my own name' / 'sign personally' added (A1 accuracy benchmark,
+    // Codex audit): the file's core "sign in the company's name, not
+    // personally, to keep the liability shield" guidance previously had no
+    // matching keyword.
+    keywords: ['liability', 'sued', 'lawsuit', 'personal assets', 'liable', 'piercing the corporate veil', 'in my own name', 'sign personally'],
   },
   {
     file: 'contracts-basics.md',
@@ -26,15 +34,29 @@ const TOPIC_RULES: TopicRule[] = [
   },
   {
     file: 'compliance-basics.md',
-    keywords: ['ein', 'business license', 'permit', 'registered agent', 'franchise tax', 'annual report filing'],
+    // 'done with paperwork' / 'ongoing compliance' added (A1 accuracy
+    // benchmark, Codex audit fix follow-up): a question like "am I done
+    // with paperwork after forming my LLC?" previously matched only
+    // business-structures.md's 'llc' keyword, missing this file's actual
+    // "Ongoing Compliance Once Formed" section, which is what the question
+    // is really asking about.
+    keywords: ['ein', 'business license', 'permit', 'registered agent', 'franchise tax', 'annual report filing', 'done with paperwork', 'ongoing compliance'],
   },
   {
     file: 'consulting-basics.md',
-    keywords: ['statement of work', ' sow ', 'purchase order', 'scope creep', 'worker classification', 'consulting agreement'],
+    // 'consulting firm' / 'consultant' added (A1 accuracy benchmark, Codex
+    // audit): questions phrased around the role ("as a consultant...", "for
+    // my consulting firm...") previously matched no keyword unless they
+    // also happened to name a specific document type.
+    keywords: ['statement of work', ' sow ', 'purchase order', 'scope creep', 'worker classification', 'consulting agreement', 'consulting firm', 'consultant'],
   },
   {
     file: 'nonprofit-basics.md',
-    keywords: ['501(c)(3)', '501c3', 'bylaws', 'board of directors', 'conflict of interest', 'form 1023', 'form 990', 'donation acknowledgment', 'donation receipt', 'charitable contribution receipt'],
+    // 'charitable solicitation' / 'solicit donations' / 'taking donations'
+    // added (A1 accuracy benchmark, Codex audit), following the same
+    // pattern as the existing donation-acknowledgment keywords: pulls in
+    // this file even before business_type is known to be 'nonprofit'.
+    keywords: ['501(c)(3)', '501c3', 'bylaws', 'board of directors', 'conflict of interest', 'form 1023', 'form 990', 'donation acknowledgment', 'donation receipt', 'charitable contribution receipt', 'charitable solicitation', 'solicit donations', 'taking donations'],
   },
 ]
 
