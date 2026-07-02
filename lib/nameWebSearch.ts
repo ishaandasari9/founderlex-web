@@ -72,6 +72,21 @@ interface TextBlockLike {
   citations?: Array<{ type: string; url?: string; title?: string | null }> | null
 }
 
+function safeSourceTitle(title: string | null | undefined, url: string): string {
+  const candidate = (title ?? url).trim()
+  if (!candidate || containsForbiddenAssertion(candidate)) return 'Source'
+  return candidate
+}
+
+function isSafeSourceUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:'
+  } catch {
+    return false
+  }
+}
+
 // Enforces the mandated disclaimer in code, since an LLM cannot be trusted to
 // reproduce a sentence verbatim on every call, and scans for a forbidden
 // assertion on the markdown-stripped text so the check and what a reader
@@ -102,8 +117,13 @@ export function extractTextAndSources(content: TextBlockLike[]): { text: string;
     if (block.type !== 'text' || typeof block.text !== 'string') continue
     parts.push(block.text)
     for (const citation of block.citations ?? []) {
-      if (citation.type === 'web_search_result_location' && citation.url && !seen.has(citation.url)) {
-        seen.set(citation.url, citation.title ?? citation.url)
+      if (
+        citation.type === 'web_search_result_location' &&
+        citation.url &&
+        isSafeSourceUrl(citation.url) &&
+        !seen.has(citation.url)
+      ) {
+        seen.set(citation.url, safeSourceTitle(citation.title, citation.url))
       }
     }
   }

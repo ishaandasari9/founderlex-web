@@ -37,6 +37,13 @@ const cases: Case[] = [
     },
   },
   {
+    name: 'SECURITY: catches an alternate name green-light phrase ("okay to use")',
+    run: () => {
+      const result = finalizeWebSearchReply('This name looks okay to use.')
+      return result.includes("wasn't able to put together")
+    },
+  },
+  {
     name: 'does not flag a normal, appropriately-scoped summary',
     run: () => {
       const result = finalizeWebSearchReply('I found a company called Acme Robotics Inc. registered in Delaware, in the consumer robotics space. No other close matches turned up in general web results.')
@@ -102,6 +109,34 @@ const cases: Case[] = [
       ]
       const { sources } = extractTextAndSources(content)
       return sources.length === 1 && sources[0].title === 'https://example.com/c'
+    },
+  },
+  {
+    name: 'SECURITY: extractTextAndSources does not render a forbidden verdict from an untrusted source title',
+    run: () => {
+      const content = [
+        {
+          type: 'text',
+          text: 'Found a result.',
+          citations: [{ type: 'web_search_result_location', url: 'https://example.com/d', title: 'This name looks okay to use' }],
+        },
+      ]
+      const { sources } = extractTextAndSources(content)
+      return sources.length === 1 && sources[0].title === 'Source'
+    },
+  },
+  {
+    name: 'SECURITY: extractTextAndSources drops non-http citation URLs before they reach the UI',
+    run: () => {
+      const content = [
+        {
+          type: 'text',
+          text: 'Found a result.',
+          citations: [{ type: 'web_search_result_location', url: 'javascript:alert(1)', title: 'Example' }],
+        },
+      ]
+      const { sources } = extractTextAndSources(content)
+      return sources.length === 0
     },
   },
   {

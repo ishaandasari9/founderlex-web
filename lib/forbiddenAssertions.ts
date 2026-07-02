@@ -34,7 +34,7 @@ const FORBIDDEN_ASSERTION_PATTERNS: RegExp[] = [
   // unrelated, legitimate FounderLex content (e.g. "no conflicts of
   // interest" in a nonprofit bylaws discussion) and must not be flagged.
   /\b(this\s+)?name\s+(is|looks|seems|appears)\s+(available|clear|safe|approved)\b/i,
-  /\b(is|looks|seems|appears)\s+(available|clear|safe)\s+to\s+(use|register)\b/i,
+  /\b(is|looks|seems|appears)\s+(available|clear|safe|okay|ok|good|ready)\s+to\s+(use|register|launch)\b/i,
   /\bno\s+(trademark|naming|brand)\s+conflicts?\b/i,
   /\bno\s+conflicts?\s+(with|for)\s+(this|the)?\s*name\b/i,
   /\bfree\s+and\s+clear\b/i,
