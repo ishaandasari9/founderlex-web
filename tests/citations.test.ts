@@ -27,7 +27,8 @@ check(CITATIONS.length >= 10, `CITATIONS has a meaningful number of entries (has
 for (const c of CITATIONS) {
   check(isOfficialCitationUrl(c.url), `${c.id}: url is an official https URL on an allow-listed domain (${c.url})`)
   check(c.label.trim().length > 0, `${c.id}: has a non-empty label`)
-  check(c.keywords.length > 0, `${c.id}: has at least one keyword`)
+  check(c.requiredClaims.length > 0, `${c.id}: has at least one required claim group`)
+  check(c.requiredClaims.every((g) => g.length > 0), `${c.id}: no required claim group is empty`)
   check(c.file.endsWith('.md'), `${c.id}: file field looks like a reference filename (${c.file})`)
 }
 
@@ -92,6 +93,43 @@ check(
   )
 }
 
+// REQUIRED (Codex re-review, Med #2, exact scenario): claim-aware citations
+// are not just topic-aware. This answer DOES mention "83(b)" — under the
+// old flat-keyword logic that alone would have earned the citation — but
+// never states the 30-day figure or the transfer language, so the specific
+// claim the Cornell citation supports was never actually made.
+{
+  const referenceFiles = ['business-structures.md']
+  const answer = "Ask a lawyer about the 83(b) election timing; I don't have the deadline."
+  const citations = selectCitations(referenceFiles, answer)
+  check(
+    citations.length === 0,
+    `REQUIRED (Codex re-review): mentioning "83(b)" alone, without the 30-day figure or transfer language, earns no citation — got: ${JSON.stringify(citations)}`,
+  )
+}
+
+// Sanity: each required claim GROUP must independently gate the citation —
+// missing any one of the three still blocks it.
+check(
+  selectCitations(['business-structures.md'], 'The 83(b) election has a deadline, but check with a lawyer for the exact number of days.').length === 0,
+  'mentioning "83(b)" and "deadline" without "30 days" still earns no citation',
+)
+check(
+  selectCitations(['business-structures.md'], 'You generally have 30 days to file an election after receiving stock, ask a lawyer which one applies.').length === 0,
+  'mentioning "30 days" without ever naming "83(b)" still earns no citation (could be a different 30-day deadline entirely)',
+)
+
+// Sanity: the Delaware citation no longer fires on "venture capital" alone
+// (Codex re-review) — only when Delaware is actually named.
+check(
+  selectCitations(['business-structures.md'], 'For venture capital, investors will expect a specific corporate structure.').length === 0,
+  'REQUIRED (Codex re-review): "venture capital" alone no longer triggers the Delaware-specific citation',
+)
+check(
+  selectCitations(['business-structures.md'], 'For venture capital, a Delaware C-Corp is the standard structure investors expect.').some((c) => c.url === 'https://corp.delaware.gov/'),
+  'the Delaware citation still fires once Delaware is actually named',
+)
+
 // ── Unsupported / out-of-scope: no fake citation ────────────────────────────
 check(
   selectCitations([], "Securities and fundraising terms are outside what I can safely help with. Please talk to a startup attorney.").length === 0,
@@ -104,6 +142,25 @@ check(
 check(
   selectCitations(['liability-basics.md'], 'You can lose your LLC liability protection by mixing personal and business funds.').length === 0,
   'an answer grounded only in liability-basics.md (deliberately uncited, common-law doctrine) shows no citation',
+)
+
+// ── Word-boundary matching for short plain-alphanumeric terms (found via
+// testing while building the requiredClaims predicates) ──────────────────
+check(
+  selectCitations(['compliance-basics.md'], 'Your paperwork is being processed by the state right now.').length === 0,
+  'REQUIRED: "being" does not false-positive match the "ein" (EIN) claim term',
+)
+check(
+  selectCitations(['compliance-basics.md'], "Don't forget to reinstate your registration before the deadline.").length === 0,
+  '"reinstate" does not false-positive match the "ein" (EIN) claim term either',
+)
+check(
+  selectCitations(['compliance-basics.md'], 'You can get an EIN for free directly from the IRS.').some((c) => c.url.includes('apply-for-an-employer-identification-number')),
+  'a genuine mention of "EIN" still matches correctly with word-boundary matching in place',
+)
+check(
+  selectCitations(['compliance-basics.md'], 'You can get an EIN, which is free, directly from the IRS.').some((c) => c.url.includes('apply-for-an-employer-identification-number')),
+  '"EIN" immediately followed by a comma still matches (word-boundary, not whitespace-only)',
 )
 
 // ── Cap and dedupe ───────────────────────────────────────────────────────────

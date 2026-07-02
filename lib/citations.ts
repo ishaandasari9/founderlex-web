@@ -27,12 +27,24 @@ export interface Citation {
   file: string
   label: string
   url: string
-  // Topic-specific keywords, checked against the model's final ANSWER text
-  // (claim-aware — see selectCitations below), not the founder's question.
-  // Finer grained than selectReferenceFiles' own per-file keyword lists,
-  // since a single reference file (e.g. ip-basics.md) covers several
-  // distinct topics that each need their own separate, correct citation.
-  keywords: string[]
+  // Claim predicate, checked against the model's final ANSWER text (not
+  // the founder's question). Each inner array is a set of interchangeable
+  // synonyms for ONE required claim component (OR within the group — any
+  // one alternative satisfies it); ALL outer groups must have at least one
+  // match for the citation to apply (AND across groups).
+  //
+  // Codex re-review (Med #2): a single flat OR-matched keyword list made
+  // citations topic-aware, not claim-aware — e.g. the 83(b) citation fired
+  // on the bare word "83(b)" alone, even for an answer that mentioned the
+  // topic but declined to actually state the deadline. A citation should
+  // only attach when the answer states the SPECIFIC claim the source
+  // supports, not merely when it brushes past the general subject. Narrow,
+  // fact-specific citations (a statute, a numeric deadline/threshold) get
+  // multiple required groups; broad topic-overview citations (a general
+  // government guide covering many sub-topics at once) reasonably keep a
+  // single group, since there's no one narrower "claim" to require beyond
+  // the topic itself.
+  requiredClaims: string[][]
 }
 
 export const CITATIONS: Citation[] = [
@@ -42,28 +54,33 @@ export const CITATIONS: Citation[] = [
     file: 'ip-basics.md',
     label: 'USPTO — Trademark Search',
     url: 'https://www.uspto.gov/trademarks/search',
-    keywords: ['trademark', 'brand name', 'logo'],
+    // The claim this page supports is specifically "search before you
+    // file" — requiring both terms means a bare mention of "trademark"
+    // (e.g. discussing ™ vs ® with no search guidance) doesn't cite it.
+    requiredClaims: [['trademark'], ['search']],
   },
   {
     id: 'copyright-registration',
     file: 'ip-basics.md',
     label: 'U.S. Copyright Office — Registration Portal',
     url: 'https://www.copyright.gov/registration/',
-    keywords: ['copyright'],
+    requiredClaims: [['copyright'], ['regist']], // 'regist' covers register/registered/registration
   },
   {
     id: 'trade-secret-policy',
     file: 'ip-basics.md',
     label: 'USPTO — Trade Secret Policy',
     url: 'https://www.uspto.gov/ip-policy/trade-secret-policy',
-    keywords: ['trade secret'],
+    // "trade secret" is already a specific two-word phrase, not a generic
+    // topic keyword — a single required group is precise enough here.
+    requiredClaims: [['trade secret']],
   },
   {
     id: 'patent-basics',
     file: 'ip-basics.md',
     label: 'USPTO — Patent Basics',
     url: 'https://www.uspto.gov/patents/basics',
-    keywords: ['patent', 'invention'],
+    requiredClaims: [['patent']],
   },
   // NDA (ip-basics.md Section 4): no citation — an NDA's enforceability is
   // ordinary contract law, no official government source states it.
@@ -74,28 +91,46 @@ export const CITATIONS: Citation[] = [
     file: 'business-structures.md',
     label: 'IRS — S Corporations',
     url: 'https://www.irs.gov/businesses/small-businesses-self-employed/s-corporations',
-    keywords: ['s-corp', 's corp'],
+    // 's corp' (space-separated) dropped for the same reason as 'c corp'
+    // below: it false-positive-matches inside unrelated words at a word
+    // boundary, e.g. "thi[s corp]oration."
+    requiredClaims: [['s-corp']],
   },
   {
     id: 'choose-business-structure',
     file: 'business-structures.md',
     label: 'SBA — Choose a Business Structure',
     url: 'https://www.sba.gov/business-guide/launch-your-business/choose-business-structure',
-    keywords: ['llc', 'c-corp', 'c corp', 'sole proprietorship', 'partnership', 'business structure', 'entity type', 'incorporate'],
+    // Broad topic-overview page (LLC vs. C-Corp vs. sole prop vs.
+    // partnership) — there's no single narrower "claim" to require beyond
+    // the topic itself, so one group of alternatives is appropriate.
+    // 'c corp' (space-separated, no hyphen) dropped: found via testing to
+    // false-positive-match inside unrelated words at a word boundary, e.g.
+    // "specifi[c corp]orate" — the hyphenated "c-corp" form (the reference
+    // material's own spelling) doesn't have this problem.
+    requiredClaims: [['llc', 'c-corp', 'sole proprietorship', 'partnership', 'business structure', 'entity type', 'incorporate']],
   },
   {
     id: 'delaware-incorporation',
     file: 'business-structures.md',
     label: 'Delaware Division of Corporations',
     url: 'https://corp.delaware.gov/',
-    keywords: ['delaware', 'venture capital'],
+    // Codex re-review: dropped the old 'venture capital' alternative — an
+    // answer can discuss raising VC without ever mentioning Delaware
+    // specifically, and citing Delaware's own registry only makes sense
+    // if the answer actually names Delaware.
+    requiredClaims: [['delaware']],
   },
   {
     id: '83b-election',
     file: 'business-structures.md',
     label: '26 U.S.C. § 83(b) (Cornell Law School, Legal Information Institute)',
     url: 'https://www.law.cornell.edu/uscode/text/26/83',
-    keywords: ['83(b)', '83b', 'section 83'],
+    // Codex re-review, exact example: requires the election name, the
+    // specific 30-day figure, AND the transfer language — not just a bare
+    // mention of "83(b)" — so an answer that raises the topic but declines
+    // to state the actual deadline earns no citation.
+    requiredClaims: [['83(b)', '83b'], ['30 days'], ['transfer', 'transferred']],
   },
 
   // ── compliance-basics.md ──────────────────────────────────────────────────
@@ -104,7 +139,7 @@ export const CITATIONS: Citation[] = [
     file: 'compliance-basics.md',
     label: 'IRS — Apply for an EIN (Free)',
     url: 'https://www.irs.gov/businesses/small-businesses-self-employed/apply-for-an-employer-identification-number-ein-online',
-    keywords: ['ein'],
+    requiredClaims: [['ein']],
   },
 
   // ── consulting-basics.md ──────────────────────────────────────────────────
@@ -113,14 +148,17 @@ export const CITATIONS: Citation[] = [
     file: 'consulting-basics.md',
     label: '17 U.S.C. § 101 — "Work Made for Hire" (Cornell Law School, Legal Information Institute)',
     url: 'https://www.law.cornell.edu/uscode/text/17/101',
-    keywords: ['work for hire', 'work-for-hire'],
+    requiredClaims: [['work for hire', 'work-for-hire']],
   },
   {
     id: 'worker-classification',
     file: 'consulting-basics.md',
     label: 'IRS — Independent Contractor (Self-Employed) or Employee?',
     url: 'https://www.irs.gov/businesses/small-businesses-self-employed/independent-contractor-self-employed-or-employee',
-    keywords: ['worker classification', 'independent contractor', 'misclassif'],
+    // These three are near-synonymous phrasings of the SAME claim
+    // (contractor-vs-employee classification), so one OR-group is correct
+    // here, not three separate AND-required groups.
+    requiredClaims: [['worker classification', 'independent contractor', 'misclassif']],
   },
 
   // ── nonprofit-basics.md ───────────────────────────────────────────────────
@@ -129,28 +167,28 @@ export const CITATIONS: Citation[] = [
     file: 'nonprofit-basics.md',
     label: 'IRS — Apply for an EIN (Free)',
     url: 'https://www.irs.gov/businesses/small-businesses-self-employed/apply-for-an-employer-identification-number-ein-online',
-    keywords: ['ein'],
+    requiredClaims: [['ein']],
   },
   {
     id: 'form-1023',
     file: 'nonprofit-basics.md',
     label: 'IRS — Application for Recognition of Exemption (Form 1023)',
     url: 'https://www.irs.gov/charities-non-profits/application-for-recognition-of-exemption',
-    keywords: ['form 1023', '1023-ez', '501(c)(3)', '501c3'],
+    requiredClaims: [['form 1023', '1023-ez', '501(c)(3)', '501c3']],
   },
   {
     id: 'conflict-of-interest-policy',
     file: 'nonprofit-basics.md',
     label: 'IRS — Instructions for Form 1023 (Appendix A: Sample Conflict of Interest Policy)',
     url: 'https://www.irs.gov/instructions/i1023',
-    keywords: ['conflict of interest'],
+    requiredClaims: [['conflict of interest']],
   },
   {
     id: 'form-990-annual-filing',
     file: 'nonprofit-basics.md',
     label: 'IRS — Annual Filing and Forms (Form 990 Series)',
     url: 'https://www.irs.gov/charities-non-profits/annual-filing-and-forms',
-    keywords: ['form 990', '990-n', '990-ez', 'annual report'],
+    requiredClaims: [['form 990', '990-n', '990-ez', 'annual report']],
   },
 ]
 
@@ -181,25 +219,35 @@ export interface SelectedCitation {
 // footnotes — matches selectReferenceFiles' own MAX_FILES cap.
 const MAX_CITATIONS = 2
 
-// Claim-aware (Codex audit, Med #3): the original version matched keywords
-// against the founder's QUESTION, not the model's ANSWER. That meant a
-// citation could show up purely because the question raised a topic, even
-// if the model's actual reply never used the cited fact at all — e.g. the
-// model declining to answer ("I don't have that in my notes, ask a
-// lawyer") would still have earned an 83(b) citation just because the
-// question mentioned 83(b). A citation only means something if it points
-// at a claim the answer actually makes.
-//
-// Matches keyword against the FINAL ANSWER TEXT instead, with the same
-// double gate as before: a citation is only selected if BOTH (a) its topic
-// keywords appear in what the model actually said, AND (b) its file is
-// among the files selectReferenceFiles chose as grounding context for this
-// turn — so a citation can never be shown for a passage the model wasn't
-// actually given, and never for a claim the model didn't actually make.
+// Claim-aware (Codex audit, Med #3, then re-review Med #2): matches against
+// the model's final ANSWER text, not the founder's question, AND requires
+// every one of a citation's requiredClaims groups to have at least one
+// match — not just any single broad topic keyword. The double gate from
+// before is unchanged: a citation is only selected if BOTH (a) all of its
+// claim groups are satisfied by what the model actually said, AND (b) its
+// file is among the files selectReferenceFiles chose as grounding context
+// for this turn — so a citation can never be shown for a passage the model
+// wasn't actually given, and never for a claim the model didn't actually
+// state in full.
+// Plain-substring matching false-positives on short, pure-alphanumeric
+// terms embedded inside an unrelated longer word — found via testing:
+// "ein" (EIN) matched inside "b[ein]g" and "r[ein]state". A word-boundary
+// regex fixes this for terms like "ein" without breaking terms that
+// contain punctuation or spaces ("83(b)", "s-corp", "trade secret"),
+// which are specific enough on their own that a plain substring check is
+// fine, and where \b anchoring behaves oddly around trailing punctuation
+// like the ")" in "83(b)".
+function matchesClaimTerm(lowerText: string, term: string): boolean {
+  if (/^[a-z0-9]+$/i.test(term)) {
+    return new RegExp(`\\b${term}\\b`, 'i').test(lowerText)
+  }
+  return lowerText.includes(term)
+}
+
 export function selectCitations(referenceFiles: string[], answerText: string): SelectedCitation[] {
   const lower = ` ${answerText.toLowerCase()} `
   const matches = CITATIONS.filter(
-    (c) => referenceFiles.includes(c.file) && c.keywords.some((kw) => lower.includes(kw)),
+    (c) => referenceFiles.includes(c.file) && c.requiredClaims.every((group) => group.some((term) => matchesClaimTerm(lower, term))),
   )
 
   // Dedupe by URL: two citations can legitimately point at the same page
