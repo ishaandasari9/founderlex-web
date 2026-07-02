@@ -60,6 +60,16 @@ const cases: Case[] = [
   { name: 'does NOT flag "it is clear that" as ordinary phrasing', run: () => !containsForbiddenAssertion('It is clear that you should talk to an attorney before finalizing this.') },
   { name: 'does NOT flag a correct recommendation to check with a trademark attorney', run: () => !containsForbiddenAssertion('A trademark attorney should review before you spend money on branding.') },
   { name: 'does NOT flag neutral reporting of search findings without a verdict', run: () => !containsForbiddenAssertion('I found a company called Acme Robotics Inc. registered in Delaware, in the consumer robotics space.') },
+
+  // Overconfident legal-outcome language outside the signing/naming context
+  // (Codex audit, AC-10 false negative): "you're protected"/"you're
+  // covered" assert a guaranteed liability outcome the same way "you'll be
+  // fine" does, but were missing from the pattern list.
+  { name: 'REGRESSION (Codex): flags "Lock it in writing, and you\'re protected."', run: () => containsForbiddenAssertion("Lock it in writing, and you're protected.") },
+  { name: 'REGRESSION (Codex): flags "you\'re fully covered"', run: () => containsForbiddenAssertion("As long as you have an NDA, you're fully covered.") },
+  { name: 'REGRESSION (Codex): flags "you are covered" (no contraction)', run: () => containsForbiddenAssertion('Do that and you are covered.') },
+  { name: 'REGRESSION (Codex): flags "you’re protected" (curly apostrophe)', run: () => containsForbiddenAssertion('Sign it and you’re protected.') },
+  { name: 'does NOT flag "you\'re not protected" (negation breaks the adjacency)', run: () => !containsForbiddenAssertion("You're not protected until the contract is signed, so get it in writing first.") },
 ]
 
 let failures = 0

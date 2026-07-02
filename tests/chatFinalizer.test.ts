@@ -45,6 +45,30 @@ check(
   'flags "you’ll be fine" (curly apostrophe)',
 )
 
+// REQUIRED (Codex audit, AC-10): "you're protected" / "you're covered" is
+// the same overconfident-outcome category as "you'll be fine" above, but
+// was missing from the pattern list.
+check(
+  finalizeChatResponse("Lock it in writing, and you're protected.").includes(FALLBACK_MARKER),
+  "REQUIRED (Codex): flags \"Lock it in writing, and you're protected.\"",
+)
+check(
+  finalizeChatResponse("As long as you have an NDA, you're fully covered.").includes(FALLBACK_MARKER),
+  'flags "you\'re fully covered"',
+)
+check(
+  finalizeChatResponse('Do that and you are covered.').includes(FALLBACK_MARKER),
+  'flags "you are covered" (no contraction)',
+)
+check(
+  finalizeChatResponse('Sign it and you’re protected.').includes(FALLBACK_MARKER),
+  'flags "you’re protected" (curly apostrophe)',
+)
+check(
+  !finalizeChatResponse("You're not protected until the contract is signed, so get it in writing first.").includes(FALLBACK_MARKER),
+  'does NOT flag "you\'re not protected" (negation breaks the adjacency, correctly accurate advice)',
+)
+
 // Existing shared patterns, proven to run through this NEW entry point too
 // (proves reuse, not just presence of the shared module).
 check(

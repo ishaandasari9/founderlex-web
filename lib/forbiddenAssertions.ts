@@ -50,6 +50,12 @@ const FORBIDDEN_ASSERTION_PATTERNS: RegExp[] = [
   // since chat output isn't guaranteed to use a straight ASCII apostrophe.
   /\byou(?:'ll|’ll|\s+will)\s+be\s+(?:totally\s+|completely\s+)?fine\b/i,
   /\bholds?\s+up\s+(?:just\s+)?fine\b/i,
+  // "you're protected" / "you're fully covered" (Codex audit, AC-10):
+  // the same overconfident-outcome category as "you'll be fine" above —
+  // asserts a guaranteed legal/liability outcome with no actual
+  // determination behind it. Apostrophe optional/curly-aware for the same
+  // reason as the pattern above.
+  /\byou(?:'re|’re|\s+are)\s+(?:fully\s+|completely\s+)?(?:protected|covered)\b/i,
 ]
 
 // A phrase split by markdown emphasis ("you can **safely** sign") or by
