@@ -36,7 +36,8 @@
     "test:accuracy-scoring": "npx tsx tests/accuracyScoring.test.ts",
     "test:accuracy": "npx tsx tests/accuracy-runner.ts",
     "test:chat-finalizer": "npx tsx tests/chatFinalizer.test.ts",
-    "test:select-references": "npx tsx tests/selectReferences.test.ts"
+    "test:select-references": "npx tsx tests/selectReferences.test.ts",
+    "test:runtime-verifier": "npx tsx tests/runtimeVerifier.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",
