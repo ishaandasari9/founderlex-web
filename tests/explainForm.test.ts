@@ -42,6 +42,30 @@ const cases: Case[] = [
     run: () => containsForbiddenAssertion(GOOD_EXPLANATION) === false,
   },
   {
+    name: 'REGRESSION (Codex): containsForbiddenAssertion catches a phrase split by markdown emphasis ("**safely**")',
+    run: () => containsForbiddenAssertion('You can **safely** sign this.') === true,
+  },
+  {
+    name: 'REGRESSION (Codex): containsForbiddenAssertion catches a phrase split by punctuation ("can, safely,")',
+    run: () => containsForbiddenAssertion('You can, safely, sign this.') === true,
+  },
+  {
+    name: 'REGRESSION (Codex): containsForbiddenAssertion catches markdown-split "legally fine"',
+    run: () => containsForbiddenAssertion('This is legally *fine* and you can proceed.') === true,
+  },
+  {
+    name: 'REGRESSION (Codex): containsForbiddenAssertion catches em-dash-split "safe to sign"',
+    run: () => containsForbiddenAssertion('It looks safe — to sign as written.') === true,
+  },
+  {
+    name: 'REGRESSION (Codex): finalizeExplanation replaces the whole reply when the forbidden phrase only appears after markdown is present in the raw model output',
+    run: () => {
+      const raw = `${GOOD_EXPLANATION}\n\nOverall, you can **safely** sign this.`
+      const result = finalizeExplanation(raw)
+      return !containsForbiddenAssertion(result) && result.startsWith("I wasn't able to put together")
+    },
+  },
+  {
     name: 'finalizeExplanation appends the exact closing line to a clean explanation',
     run: () => finalizeExplanation(GOOD_EXPLANATION).endsWith(EXPLAIN_CLOSING_LINE),
   },

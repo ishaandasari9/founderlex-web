@@ -99,6 +99,13 @@ const cases: Case[] = [
     },
   },
   {
+    name: 'REGRESSION (Codex): checkAssistantOverstep catches a jailbroken reply even when the forbidden phrase is split by markdown emphasis',
+    run: () => {
+      const flag = checkAssistantOverstep('Overall, you can **safely** sign this one without a lawyer.')
+      return flag !== null && flag.id === 'assistant_overstep'
+    },
+  },
+  {
     name: 'checkAssistantOverstep returns null for a normal, appropriately-scoped reply',
     run: () => {
       const reply = "A Founders' Agreement locks in your equity split and vesting schedule before you build anything. Are both co-founders full-time from day one?"

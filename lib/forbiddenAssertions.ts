@@ -15,6 +15,22 @@ const FORBIDDEN_ASSERTION_PATTERNS: RegExp[] = [
   /no\s+(need|reason)\s+to\s+(worry|consult|see a lawyer)/i,
 ]
 
+// A phrase split by markdown emphasis ("you can **safely** sign") or by
+// punctuation ("you can, safely, sign") breaks the \s+ literal-adjacency
+// patterns above, letting a forbidden phrase through undetected in raw form
+// even though it reads identically to a person once rendered/spoken. Strip
+// markdown markers entirely and collapse punctuation into whitespace before
+// testing, so word adjacency for detection purposes matches what a reader
+// actually sees, regardless of what formatting or punctuation sits between
+// the words.
+function normalizeForDetection(text: string): string {
+  return text
+    .replace(/[*_`#]+/g, '')
+    .replace(/[,;:—–-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+}
+
 export function containsForbiddenAssertion(text: string): boolean {
-  return FORBIDDEN_ASSERTION_PATTERNS.some((p) => p.test(text))
+  const normalized = normalizeForDetection(text)
+  return FORBIDDEN_ASSERTION_PATTERNS.some((p) => p.test(normalized))
 }

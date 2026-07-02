@@ -74,9 +74,17 @@ function stripMarkdownFormatting(text: string): string {
 
 // Enforces the mandated closing line in code, since an LLM cannot be trusted
 // to reproduce a sentence verbatim on every call.
+//
+// The forbidden-assertion check runs on the markdown-stripped text, not the
+// raw model output: containsForbiddenAssertion normalizes internally too,
+// but stripping here first means the check and the text a reader would
+// actually see are exactly the same string, rather than relying solely on
+// the shared normalizer to stay in sync with whatever formatting the model
+// happens to produce.
 export function finalizeExplanation(raw: string): string {
-  if (containsForbiddenAssertion(raw)) return SAFE_FALLBACK
-  const body = stripAttemptedClosingLine(stripMarkdownFormatting(raw))
+  const stripped = stripMarkdownFormatting(raw)
+  if (containsForbiddenAssertion(stripped)) return SAFE_FALLBACK
+  const body = stripAttemptedClosingLine(stripped)
   return `${body}\n\n${EXPLAIN_CLOSING_LINE}`
 }
 
