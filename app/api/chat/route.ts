@@ -84,7 +84,11 @@ export async function POST(req: Request) {
     // either safety fallback (CHAT_SAFE_FALLBACK / VERIFIER_SAFE_FALLBACK)
     // — none of those actually cite a specific passage, and showing one
     // anyway would be exactly the fabrication this feature exists to avoid.
-    const citations = isCannedSafeResponse(text) ? [] : selectCitations(referenceFiles, lastUserMessage)
+    // Claim-aware (Codex audit, Med #3): matched against the final ANSWER
+    // text, not the question — a citation only means something if the
+    // model's actual reply uses the claim, not just because the question
+    // raised the topic.
+    const citations = isCannedSafeResponse(text) ? [] : selectCitations(referenceFiles, text)
 
     return NextResponse.json({ content: text, profile: updatedProfile, citations })
   } catch (err: unknown) {

@@ -27,10 +27,11 @@ export interface Citation {
   file: string
   label: string
   url: string
-  // Topic-specific keywords, checked against the founder's question — finer
-  // grained than selectReferenceFiles' own per-file keyword lists, since a
-  // single reference file (e.g. ip-basics.md) covers several distinct
-  // topics that each need their own separate, correct citation.
+  // Topic-specific keywords, checked against the model's final ANSWER text
+  // (claim-aware — see selectCitations below), not the founder's question.
+  // Finer grained than selectReferenceFiles' own per-file keyword lists,
+  // since a single reference file (e.g. ip-basics.md) covers several
+  // distinct topics that each need their own separate, correct citation.
   keywords: string[]
 }
 
@@ -180,16 +181,23 @@ export interface SelectedCitation {
 // footnotes — matches selectReferenceFiles' own MAX_FILES cap.
 const MAX_CITATIONS = 2
 
-// Mirrors lib/selectReferences.ts's selectReferenceFiles keyword-matching
-// approach, but at citation (single-passage) granularity. A citation is
-// only ever selected if BOTH (a) its own topic keywords match the
-// question, AND (b) its file is among the files selectReferenceFiles
-// actually chose as grounding context for this turn — so a citation can
-// never be shown for a passage the model wasn't actually given. This is the
-// same signal used to decide grounding in the first place, deliberately not
-// a separate/looser heuristic that could drift out of sync with it.
-export function selectCitations(referenceFiles: string[], latestUserMessage: string): SelectedCitation[] {
-  const lower = ` ${latestUserMessage.toLowerCase()} `
+// Claim-aware (Codex audit, Med #3): the original version matched keywords
+// against the founder's QUESTION, not the model's ANSWER. That meant a
+// citation could show up purely because the question raised a topic, even
+// if the model's actual reply never used the cited fact at all — e.g. the
+// model declining to answer ("I don't have that in my notes, ask a
+// lawyer") would still have earned an 83(b) citation just because the
+// question mentioned 83(b). A citation only means something if it points
+// at a claim the answer actually makes.
+//
+// Matches keyword against the FINAL ANSWER TEXT instead, with the same
+// double gate as before: a citation is only selected if BOTH (a) its topic
+// keywords appear in what the model actually said, AND (b) its file is
+// among the files selectReferenceFiles chose as grounding context for this
+// turn — so a citation can never be shown for a passage the model wasn't
+// actually given, and never for a claim the model didn't actually make.
+export function selectCitations(referenceFiles: string[], answerText: string): SelectedCitation[] {
+  const lower = ` ${answerText.toLowerCase()} `
   const matches = CITATIONS.filter(
     (c) => referenceFiles.includes(c.file) && c.keywords.some((kw) => lower.includes(kw)),
   )

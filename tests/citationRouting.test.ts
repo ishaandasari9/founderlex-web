@@ -36,30 +36,35 @@ check(isCannedSafeResponse('') === false, 'does not flag an empty string as cann
 // fallback/guard response must never carry a citation, even when the
 // reference files that would normally justify one were selected for the
 // turn. This mirrors exactly what app/api/chat/route.ts does: citations
-// are computed only when the response text isn't a canned safe response. ──
-function citationsForResponse(text: string, referenceFiles: string[], latestUserMessage: string) {
-  return isCannedSafeResponse(text) ? [] : selectCitations(referenceFiles, latestUserMessage)
+// are computed only when the response text isn't a canned safe response,
+// and selectCitations is called with that SAME final text (claim-aware,
+// Codex audit Med #3 — not the question). ─────────────────────────────────
+function citationsForResponse(text: string, referenceFiles: string[]) {
+  return isCannedSafeResponse(text) ? [] : selectCitations(referenceFiles, text)
 }
 
 check(
-  citationsForResponse(VERIFIER_SAFE_FALLBACK, ['business-structures.md'], 'When is the 83(b) deadline?').length === 0,
-  'REQUIRED: an A2 verifier fallback shows no citation, even though the question and reference files would otherwise have earned one',
+  citationsForResponse(VERIFIER_SAFE_FALLBACK, ['business-structures.md']).length === 0,
+  'REQUIRED: an A2 verifier fallback shows no citation, even though the reference files would otherwise have earned one',
 )
 check(
-  citationsForResponse(CHAT_SAFE_FALLBACK, ['ip-basics.md'], 'How do I trademark my company name?').length === 0,
-  'REQUIRED: a layer-4 forbidden-assertion fallback shows no citation, even though the question and reference files would otherwise have earned one',
+  citationsForResponse(CHAT_SAFE_FALLBACK, ['ip-basics.md']).length === 0,
+  'REQUIRED: a layer-4 forbidden-assertion fallback shows no citation, even though the reference files would otherwise have earned one',
 )
 check(
-  citationsForResponse(GUARD_CATEGORIES[0].response, ['business-structures.md'], 'When is the 83(b) deadline?').length === 0,
+  citationsForResponse(GUARD_CATEGORIES[0].response, ['business-structures.md']).length === 0,
   'REQUIRED: an out-of-scope guard refusal shows no citation',
 )
 check(
   citationsForResponse(
-    'A Delaware C-Corp is standard for VC funding, and any 83(b) election needs to be filed within 30 days.',
+    'Any 83(b) election needs to be filed within 30 days after the stock is transferred, so do not wait.',
     ['business-structures.md'],
-    'When is the 83(b) deadline?',
   ).length === 1,
-  'a genuine answer (not a canned response) still earns its citation',
+  'a genuine answer (not a canned response) that states the claim still earns its citation',
+)
+check(
+  citationsForResponse("I don't have that in my notes; ask a lawyer.", ['business-structures.md']).length === 0,
+  'REQUIRED (Codex, claim-aware): a genuine (non-canned) answer that declines to state the claim earns no citation, even with the right reference file selected',
 )
 
 console.log(`\n${failures === 0 ? 'PASS' : 'FAIL'}: ${checks} checks run, ${failures} failed`)

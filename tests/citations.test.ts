@@ -42,17 +42,22 @@ check(isOfficialCitationUrl('https://irs.gov.evil.com/phish') === false, 'reject
 check(isOfficialCitationUrl('https://not-a-real-gov-site.com') === false, 'rejects a domain not on the allowlist')
 check(isOfficialCitationUrl('not a url at all') === false, 'rejects a malformed string')
 
-// ── selectCitations: the double gate (file selected AND keyword match) ────
+// ── selectCitations: claim-aware (Codex audit, Med #3) — matched against
+// the ANSWER text, not the question, plus the pre-existing double gate
+// (file selected AND keyword match) ─────────────────────────────────────────
 check(
-  selectCitations(['ip-basics.md'], 'How do I trademark my company name?').some((c) => c.url.includes('uspto.gov/trademarks/search')),
-  'selects the trademark citation when ip-basics.md is selected and the question mentions trademark',
+  selectCitations(
+    ['ip-basics.md'],
+    'First, search the USPTO trademark database to make sure the name is clear, then file to register it.',
+  ).some((c) => c.url.includes('uspto.gov/trademarks/search')),
+  'selects the trademark citation when ip-basics.md is selected and the ANSWER mentions trademark',
 )
 check(
-  selectCitations([], 'How do I trademark my company name?').length === 0,
-  'REQUIRED: selects no citation when no reference file was selected, even if the question matches a keyword (the file was never actually shown to the model)',
+  selectCitations([], 'You should search the USPTO trademark database before filing.').length === 0,
+  'REQUIRED: selects no citation when no reference file was selected, even if the answer matches a keyword (the file was never actually shown to the model)',
 )
 check(
-  selectCitations(['business-structures.md'], 'How do I trademark my company name?').length === 0,
+  selectCitations(['business-structures.md'], 'You should search the USPTO trademark database before filing.').length === 0,
   'selects no citation when the keyword matches a topic but the FILE that citation belongs to was not selected',
 )
 
@@ -61,41 +66,61 @@ check(
 // source. This mirrors what app/api/chat/route.ts does: selectReferenceFiles
 // picks business-structures.md for this question (see
 // selectReferences.test.ts's A3 regression), then selectCitations is called
-// with that same file list and question.
+// with the SAME file list and the model's actual final answer text.
 {
   const referenceFiles = ['business-structures.md']
-  const question = 'When is the 83(b) deadline?'
-  const citations = selectCitations(referenceFiles, question)
-  check(citations.length === 1, 'REQUIRED: the 83(b) deadline question surfaces exactly one citation')
+  const answer = 'The 83(b) election must be filed within 30 days after the restricted stock is transferred.'
+  const citations = selectCitations(referenceFiles, answer)
+  check(citations.length === 1, 'REQUIRED: an answer stating the 83(b) deadline surfaces exactly one citation')
   check(
     citations[0]?.url === 'https://www.law.cornell.edu/uscode/text/26/83',
-    `REQUIRED: the 83(b) deadline question cites the correct source (26 U.S.C. § 83) — got: ${citations[0]?.url}`,
+    `REQUIRED: the 83(b) answer cites the correct source (26 U.S.C. § 83) — got: ${citations[0]?.url}`,
+  )
+}
+
+// REQUIRED (Codex audit, Med #3, exact scenario): the question raises 83(b)
+// and the file is selected as grounding, but the model's actual answer
+// declines to state the claim at all — no citation, because the answer
+// never used it.
+{
+  const referenceFiles = ['business-structures.md']
+  const answer = "I don't have that in my notes; ask a lawyer."
+  const citations = selectCitations(referenceFiles, answer)
+  check(
+    citations.length === 0,
+    `REQUIRED (Codex): a declined/non-answer earns no citation even though referenceFiles/the question would have — got: ${JSON.stringify(citations)}`,
   )
 }
 
 // ── Unsupported / out-of-scope: no fake citation ────────────────────────────
 check(
-  selectCitations([], 'What terms should we negotiate in our seed round term sheet?').length === 0,
-  'REQUIRED: an out-of-scope-style question with no reference files selected shows no citation',
+  selectCitations([], "Securities and fundraising terms are outside what I can safely help with. Please talk to a startup attorney.").length === 0,
+  'REQUIRED: an out-of-scope-style refusal with no reference files selected shows no citation',
 )
 check(
-  selectCitations(['contracts-basics.md'], 'What makes a contract legally binding?').length === 0,
-  'REQUIRED: a question grounded only in a file with no citation entries (contracts-basics.md, deliberately uncited) shows no citation, never a fabricated one',
+  selectCitations(['contracts-basics.md'], 'A contract needs offer, acceptance, and consideration to be legally binding.').length === 0,
+  'REQUIRED: an answer grounded only in a file with no citation entries (contracts-basics.md, deliberately uncited) shows no citation, never a fabricated one',
 )
 check(
-  selectCitations(['liability-basics.md'], 'Can I lose my LLC liability protection?').length === 0,
-  'a question grounded only in liability-basics.md (deliberately uncited, common-law doctrine) shows no citation',
+  selectCitations(['liability-basics.md'], 'You can lose your LLC liability protection by mixing personal and business funds.').length === 0,
+  'an answer grounded only in liability-basics.md (deliberately uncited, common-law doctrine) shows no citation',
 )
 
 // ── Cap and dedupe ───────────────────────────────────────────────────────────
 check(
-  selectCitations(['nonprofit-basics.md'], 'Do I need an EIN, and should I file Form 1023 or 1023-EZ?').length <= 2,
+  selectCitations(
+    ['nonprofit-basics.md'],
+    'You need an EIN first, then decide between Form 1023 and Form 1023-EZ based on your projected receipts.',
+  ).length <= 2,
   'selectCitations never returns more than the cap even when multiple topics are mentioned',
 )
 {
   // Both compliance-basics.md and nonprofit-basics.md have an EIN citation
   // pointing at the exact same URL — confirm it only shows once.
-  const citations = selectCitations(['compliance-basics.md', 'nonprofit-basics.md'], 'Do I need an EIN for my nonprofit?')
+  const citations = selectCitations(
+    ['compliance-basics.md', 'nonprofit-basics.md'],
+    'You can get an EIN for free directly from the IRS in about ten minutes.',
+  )
   const einUrls = citations.filter((c) => c.url.includes('apply-for-an-employer-identification-number'))
   check(einUrls.length === 1, 'the same URL cited from two different files is deduplicated to one citation')
 }
