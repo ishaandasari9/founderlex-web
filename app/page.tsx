@@ -16,6 +16,8 @@ import NameSearchPanel from '@/components/NameSearchPanel'
 import ReadAloudButton from '@/components/ReadAloudButton'
 import MicButton from '@/components/MicButton'
 import ExplainFormPanel from '@/components/ExplainFormPanel'
+import RedFlagCard from '@/components/RedFlagCard'
+import { detectRedFlags, type RedFlag } from '@/lib/redFlags'
 import BeforeYouSignChecklist from '@/components/BeforeYouSignChecklist'
 
 // ── React Bits — SSR disabled (motion/react needs window) ────────────────────
@@ -57,10 +59,11 @@ const DoorHero    = dynamic(() => import('../components/door/DoorHero'), {
 // ── Types ────────────────────────────────────────────────────────────────────
 type Act = 'door' | 'about' | 'chat'
 interface Msg {
-  role: 'user' | 'bot' | 'doc-card' | 'checklist-card'
+  role: 'user' | 'bot' | 'doc-card' | 'checklist-card' | 'redflag-card'
   text: string
   template?: string
   filled?: string
+  flags?: RedFlag[]
   isLoading?: boolean
 }
 
@@ -475,6 +478,9 @@ export default function Home() {
       const tpl = detectTemplate(reply)
       if (tpl) result.push({ role: 'doc-card', text: '', template: tpl })
 
+      const flags = detectRedFlags(t)
+      if (flags.length > 0) result.push({ role: 'redflag-card', text: '', flags })
+
       setMessages(result)
       persistSession(result, updatedProfile)
     } catch {
@@ -530,6 +536,8 @@ export default function Home() {
       setGeneratedDocs(prev => [...prev, { template: confirmPanel.template, label, filled }])
       setMessages(prev => {
         const next: Msg[] = [...prev, { role: 'checklist-card', text: '', template: confirmPanel.template, filled }]
+        const flags = detectRedFlags(filled)
+        if (flags.length > 0) next.push({ role: 'redflag-card', text: '', flags })
         persistSession(next, profileRef.current)
         return next
       })
@@ -932,6 +940,13 @@ export default function Home() {
                       label={TEMPLATE_LABELS[m.template] ?? m.template}
                       filled={m.filled ?? ''}
                     />
+                  </div>
+                )
+              }
+              if (m.role === 'redflag-card' && m.flags) {
+                return (
+                  <div key={i} style={{ display: 'flex', paddingLeft: 39 }}>
+                    <RedFlagCard flags={m.flags} />
                   </div>
                 )
               }

@@ -2,17 +2,24 @@ import type { ChatMessage } from './chat'
 
 // Code-level backstop for categories that must never get a substantive answer,
 // even if the model would otherwise try to help. Keyword/regex only, no LLM call.
+//
+// GUARD_CATEGORIES is exported (not just used internally) so other features —
+// notably lib/redFlags.ts — can reuse these exact patterns instead of
+// re-typing the same regexes with a chance of drifting out of sync.
 
-interface Rule {
+export interface GuardCategory {
+  id: string
+  label: string
   patterns: RegExp[]
   response: string
 }
 
 const WARM_PREFIX = "I want to make sure you're taken care of here, so I'll be straight with you: "
 
-const RULES: Rule[] = [
+export const GUARD_CATEGORIES: GuardCategory[] = [
   {
-    // Criminal matters
+    id: 'criminal',
+    label: 'Possible criminal matter',
     patterns: [
       /\bsubpoena\b/i,
       /\bFBI\b/,
@@ -25,6 +32,8 @@ const RULES: Rule[] = [
       "this sounds like it could involve a criminal matter, which is outside what I can safely help with. Please contact a criminal defense attorney right away, this isn't something to navigate without one.",
   },
   {
+    id: 'active_dispute',
+    label: 'Active legal dispute or threat',
     // Active disputes and received legal threats (cease & desist, being sued, infringement claims)
     patterns: [
       /cease[\s-]+(and|&)[\s-]+desist/i,
@@ -38,7 +47,8 @@ const RULES: Rule[] = [
       "this sounds like it's crossed into an active legal dispute or a legal threat, which is outside what I can safely help with. Please talk to a licensed attorney (litigation, securities, IP, or employment, depending on the details) as soon as you can. They can advise on the specifics of your situation and any deadlines that may apply. I can't evaluate the claim, draft a response to it, or tell you who's likely right here.",
   },
   {
-    // Securities / fundraising terms
+    id: 'securities',
+    label: 'Securities or fundraising terms',
     patterns: [
       /\bSAFEs?\b/,
       /\bconvertible note\b/i,
@@ -52,7 +62,8 @@ const RULES: Rule[] = [
       "securities and fundraising terms, like SAFEs, convertible notes, or term sheets, are outside what I can safely help with. Please talk to a startup or securities attorney, they can walk you through what's standard and make sure the terms actually protect you.",
   },
   {
-    // Immigration
+    id: 'immigration',
+    label: 'Immigration question',
     patterns: [
       /\bvisa\b/i,
       /\bF-1\b/i,
@@ -65,7 +76,8 @@ const RULES: Rule[] = [
       "immigration questions are outside what I can safely help with. Please talk to a licensed immigration attorney, they can advise you based on your specific visa status and situation.",
   },
   {
-    // Tax strategy
+    id: 'tax_strategy',
+    label: 'Tax strategy question',
     patterns: [
       /\btax (strategy|burden|planning)\b/i,
       /\bminimize\b[\s\S]{0,25}\btax/i,
@@ -85,8 +97,8 @@ export function detectOutOfScope(messages: ChatMessage[]): string | null {
     .map((m) => m.content)
     .join('\n')
 
-  for (const rule of RULES) {
-    if (rule.patterns.some((p) => p.test(userText))) return rule.response
+  for (const category of GUARD_CATEGORIES) {
+    if (category.patterns.some((p) => p.test(userText))) return category.response
   }
   return null
 }
