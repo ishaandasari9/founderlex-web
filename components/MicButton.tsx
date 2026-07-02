@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Mic, Square } from 'lucide-react'
 import { isSpeechRecognitionSupported, startDictation, type DictationController } from '@/lib/speechRecognition'
+import { createDictationAccumulator } from '@/lib/dictationAccumulator'
 
 const RED   = '#DB1A1A'
 const FAINT = '#9B8F82'
@@ -21,11 +22,20 @@ export default function MicButton({
   const supported = useIsSupported(isSpeechRecognitionSupported)
   const [listening, setListening] = useState(false)
   const controllerRef = useRef<DictationController | null>(null)
-  const baseTextRef = useRef('')
+  const accumulatorRef = useRef(createDictationAccumulator())
 
   useEffect(() => {
     return () => { controllerRef.current?.stop() }
   }, [])
+
+  // The chat input can change for reasons that have nothing to do with this
+  // component: the user typing, or the parent clearing it after a message is
+  // sent. Resync so a later dictation continues from what's actually in the
+  // box instead of a stale base string left over from a previous session
+  // (this is what caused old, already-sent text to reappear).
+  useEffect(() => {
+    accumulatorRef.current.sync(value)
+  }, [value])
 
   if (!supported) return null
 
@@ -41,11 +51,10 @@ export default function MicButton({
       return
     }
 
-    baseTextRef.current = value.trim() ? `${value.trim()} ` : ''
+    accumulatorRef.current.start(value)
     const controller = startDictation({
       onResult: (finalChunk, interimChunk) => {
-        if (finalChunk) baseTextRef.current = `${baseTextRef.current}${finalChunk} `
-        onChange(`${baseTextRef.current}${interimChunk}`)
+        onChange(accumulatorRef.current.update(finalChunk, interimChunk))
       },
       onEnd: () => setListening(false),
       onError: (error) => {
