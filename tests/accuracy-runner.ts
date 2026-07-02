@@ -30,8 +30,10 @@ import { getChatResponse, validateChatInput } from '../lib/chat'
 import { extractProfile } from '../lib/extractProfile'
 import { validateProfile, describeProfile } from '../lib/founderProfile'
 import { selectReferenceFiles } from '../lib/selectReferences'
+import { detectOutOfScope } from '../lib/outOfScopeGuard'
+import { containsForbiddenAssertion } from '../lib/forbiddenAssertions'
 import { ACCURACY_DATASET, type AccuracyCase } from './accuracy-dataset'
-import { computeExitCode } from './accuracyScoring'
+import { computeExitCode, type GradedCase } from './accuracyScoring'
 
 // ── Reference grounding context (mirrors app/api/chat/route.ts's local helper) ─
 const referenceCache = new Map<string, string>()
@@ -106,6 +108,11 @@ interface CaseResult {
   groundedVerdict: Verdict
   ungroundedResponse: string
   ungroundedVerdict: Verdict
+  // Deterministic safety signals (no LLM judge involved) — see
+  // tests/accuracyScoring.ts's GradedCase for why these are kept separate
+  // from groundedVerdict.pass.
+  guardFired: boolean
+  safetyViolation: boolean
 }
 
 // Runs the SAME steps app/api/chat/route.ts runs for a real request
@@ -134,10 +141,20 @@ async function runCase(item: AccuracyCase): Promise<CaseResult> {
   const groundedResponse = await getChatResponse(messages, undefined, undefined, profileContext, referenceContext)
   const groundedVerdict = await judgeAnswer(item, groundedResponse)
 
+  // Deterministic, no LLM call: containsForbiddenAssertion re-checks the
+  // final returned text as an independent backstop against
+  // lib/chat.ts's finalizeChatResponse regressing (it's supposed to have
+  // already caught and replaced anything this would flag).
+  const safetyViolation = containsForbiddenAssertion(groundedResponse)
+
   // Out-of-scope rows are guard-shortcircuited in getChatResponse before the
   // reference context (or the LLM) is ever consulted, so grounding cannot
   // change the outcome — skip the redundant calls and reuse the result.
   if (!item.in_scope) {
+    // Deterministic, no LLM call: did lib/outOfScopeGuard.ts's hard-stop
+    // actually fire for this question? This is the safety-critical signal
+    // for out-of-scope rows, not the judge's groundedVerdict.pass.
+    const guardFired = detectOutOfScope(messages) !== null
     return {
       item,
       businessType: profile.business_type,
@@ -146,6 +163,8 @@ async function runCase(item: AccuracyCase): Promise<CaseResult> {
       groundedVerdict,
       ungroundedResponse: groundedResponse,
       ungroundedVerdict: groundedVerdict,
+      guardFired,
+      safetyViolation,
     }
   }
 
@@ -163,6 +182,10 @@ async function runCase(item: AccuracyCase): Promise<CaseResult> {
     groundedVerdict,
     ungroundedResponse,
     ungroundedVerdict,
+    // Not a meaningful failure mode for in-scope questions (the guard
+    // correctly not firing isn't gated here) — see GradedCase's contract.
+    guardFired: true,
+    safetyViolation,
   }
 }
 
@@ -182,6 +205,12 @@ function buildReport(results: CaseResult[]): string {
   const inScopeUngroundedPassed = inScopeResults.filter((r) => r.ungroundedVerdict.pass).length
   const outOfScopeBlocked = outOfScopeResults.filter((r) => r.groundedVerdict.pass).length
 
+  // The two deterministic, zero-tolerance safety signals (no LLM judge
+  // involved) — kept separate from the judge-graded numbers above.
+  const guardMisses = outOfScopeResults.filter((r) => !r.guardFired)
+  const safetyViolations = results.filter((r) => r.safetyViolation)
+  const safetyClean = guardMisses.length === 0 && safetyViolations.length === 0
+
   const lines: string[] = [
     '# FounderLex Accuracy Benchmark (A1)',
     '',
@@ -191,24 +220,30 @@ function buildReport(results: CaseResult[]): string {
     '',
     '## Headline numbers',
     '',
+    `- **Safety (deterministic, zero tolerance): ${safetyClean ? 'CLEAN — 0 misses' : `${guardMisses.length + safetyViolations.length} MISS(ES)`}** — out-of-scope guard fired for every out-of-scope question (${outOfScopeResults.length - guardMisses.length}/${outOfScopeResults.length}) and no forbidden/overconfident assertion leaked into any final response (${results.length - safetyViolations.length}/${results.length}). No LLM judge involved in this number — checked directly against \`detectOutOfScope\` and \`containsForbiddenAssertion\`.`,
+    `- **In-scope content accuracy (judge-graded, 90% floor): ${pct(inScopeGroundedPassed, inScopeResults.length)}** (${inScopeGroundedPassed}/${inScopeResults.length}) — the noise-tolerant number; a miss here (e.g. a by-design clarifying-question turn scored unfairly by a single-turn judge) does not fail the run on its own as long as it stays at or above 90%.`,
     `- **Overall accuracy (with grounding, real pipeline): ${pct(groundedPassed, total)}** (${groundedPassed}/${total})`,
-    `- **In-scope accuracy, with grounding: ${pct(inScopeGroundedPassed, inScopeResults.length)}** (${inScopeGroundedPassed}/${inScopeResults.length})`,
     `- **In-scope accuracy, without grounding: ${pct(inScopeUngroundedPassed, inScopeResults.length)}** (${inScopeUngroundedPassed}/${inScopeResults.length}) — proves whether the reference base matters`,
-    `- **Out-of-scope block rate: ${pct(outOfScopeBlocked, outOfScopeResults.length)}** (${outOfScopeBlocked}/${outOfScopeResults.length}) — all out-of-scope questions correctly refused`,
+    `- **Out-of-scope block rate (judge-graded, reporting only): ${pct(outOfScopeBlocked, outOfScopeResults.length)}** (${outOfScopeBlocked}/${outOfScopeResults.length})`,
     `- **Overall accuracy (without grounding): ${pct(ungroundedPassed, total)}** (${ungroundedPassed}/${total})`,
     '',
     '## Per-question results',
     '',
-    '| # | Question | Scope | Extracted business_type | Reference file(s) selected | Grounded | Ungrounded |',
-    '|---|---|---|---|---|---|---|',
+    '| # | Question | Scope | Extracted business_type | Reference file(s) selected | Safety | Content (grounded) | Content (ungrounded) |',
+    '|---|---|---|---|---|---|---|---|',
     ...results.map((r) => {
       const q = r.item.question.length > 70 ? r.item.question.slice(0, 67) + '...' : r.item.question
       const scope = r.item.in_scope ? 'in-scope' : 'out-of-scope'
       const businessType = r.businessType ?? '(none)'
       const files = r.referenceFiles.length ? r.referenceFiles.join(', ') : '(none selected)'
+      const safety = r.safetyViolation
+        ? '❌ LEAK'
+        : !r.item.in_scope && !r.guardFired
+          ? '❌ GUARD MISS'
+          : '✅'
       const g = r.groundedVerdict.pass ? '✅' : '❌'
       const u = r.item.in_scope ? (r.ungroundedVerdict.pass ? '✅' : '❌') : '—'
-      return `| ${r.item.id} | ${q.replace(/\|/g, '\\|')} | ${scope} | ${businessType} | ${files} | ${g} | ${u} |`
+      return `| ${r.item.id} | ${q.replace(/\|/g, '\\|')} | ${scope} | ${businessType} | ${files} | ${safety} | ${g} | ${u} |`
     }),
     '',
     '## Failures (evidence detail)',
@@ -270,10 +305,19 @@ async function main() {
 
   // Codex audit (High): this used to exit 0 unconditionally, so a real
   // regression in the grounded (real-pipeline) results would silently pass.
-  // Fail the run on any grounded miss, so CI/terminal usage actually gates.
-  const exitCode = computeExitCode(results.map((r) => ({ in_scope: r.item.in_scope, pass: r.groundedVerdict.pass })))
+  // Two independent gates (see accuracyScoring.ts): a deterministic,
+  // zero-tolerance safety check (guard fired + no forbidden-assertion leak)
+  // that always fails the run on a single miss, and a noise-tolerant 90%
+  // floor on judge-graded in-scope content accuracy.
+  const gradedResults: GradedCase[] = results.map((r) => ({
+    in_scope: r.item.in_scope,
+    pass: r.groundedVerdict.pass,
+    guardFired: r.guardFired,
+    safetyViolation: r.safetyViolation,
+  }))
+  const exitCode = computeExitCode(gradedResults)
   if (exitCode !== 0) {
-    console.error(`\nFAILING: at least one grounded case did not pass, or a required threshold was missed. See tests/ACCURACY-RESULTS.md for details.`)
+    console.error(`\nFAILING: a safety check missed, or in-scope content accuracy fell below the 90% floor. See tests/ACCURACY-RESULTS.md for details.`)
   }
   process.exit(exitCode)
 }
