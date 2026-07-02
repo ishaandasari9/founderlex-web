@@ -1,5 +1,6 @@
 import {
   containsForbiddenAssertion,
+  containsComparativeVerdict,
   finalizeComparison,
   compareDocuments,
   wrapOriginal,
@@ -76,6 +77,52 @@ const cases: Case[] = [
     },
   },
   {
+    name: 'BOUNDARY (Codex High): containsComparativeVerdict flags "the revised version is safer for the founder"',
+    run: () => containsComparativeVerdict('The revised version is safer for the founder.') === true,
+  },
+  {
+    name: 'BOUNDARY (Codex High): containsComparativeVerdict flags "Version 2 is better"',
+    run: () => containsComparativeVerdict('Overall, Version 2 is better.') === true,
+  },
+  {
+    name: 'BOUNDARY (Codex High): containsComparativeVerdict flags "I would choose the revised version"',
+    run: () => containsComparativeVerdict('I would choose the revised version.') === true,
+  },
+  {
+    name: 'BOUNDARY (Codex High): containsComparativeVerdict flags "the original is worse"',
+    run: () => containsComparativeVerdict('In short, the original is worse.') === true,
+  },
+  {
+    name: 'BOUNDARY (Codex High): containsComparativeVerdict flags "go with the revised version"',
+    run: () => containsComparativeVerdict('My advice: go with the revised version.') === true,
+  },
+  {
+    name: 'BOUNDARY: containsComparativeVerdict catches a verdict split by markdown emphasis',
+    run: () => containsComparativeVerdict('The revised version is **safer** for you.') === true,
+  },
+  {
+    name: 'BOUNDARY: containsComparativeVerdict does NOT flag descriptive language ("adds a better definition")',
+    run: () =>
+      containsComparativeVerdict(
+        'The revised version adds a better definition of confidential information and is clearer about payment terms.',
+      ) === false,
+  },
+  {
+    name: 'BOUNDARY: containsComparativeVerdict does NOT flag a neutral factual change ("term is two years instead of five")',
+    run: () =>
+      containsComparativeVerdict(
+        'In the revised version the confidentiality term is two years instead of five.',
+      ) === false,
+  },
+  {
+    name: 'BOUNDARY: finalizeComparison falls back when the model picks a "safer version"',
+    run: () => {
+      const bad = `${GOOD_COMPARISON}\n\nOn balance, the revised version is safer for you.`
+      const result = finalizeComparison(bad)
+      return result.startsWith("I wasn't able to put together")
+    },
+  },
+  {
     name: 'compareDocuments rejects a missing version without making a network call',
     run: async () => {
       try {
@@ -103,6 +150,16 @@ const cases: Case[] = [
       const result = await compareDocuments(
         'This is a cease and desist letter I received from a competitor.',
         'Here is the revised cease and desist letter they sent back.',
+      )
+      return result.includes('licensed attorney') && !result.includes(COMPARE_CLOSING_LINE)
+    },
+  },
+  {
+    name: 'compareDocuments out-of-scope guard fires when only the REVISED field carries the disallowed topic (no network call)',
+    run: async () => {
+      const result = await compareDocuments(
+        'This is a simple mutual non-disclosure agreement between two companies.',
+        'This is a cease and desist letter I received from a competitor.',
       )
       return result.includes('licensed attorney') && !result.includes(COMPARE_CLOSING_LINE)
     },

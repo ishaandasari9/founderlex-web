@@ -69,6 +69,57 @@ export function wrapRevised(text: string): string {
 const SAFE_FALLBACK =
   `I wasn't able to put together a comparison that stays within what I'm allowed to do here. Please paste both versions again, or bring them straight to a licensed attorney. ${COMPARE_CLOSING_LINE}`
 
+// Compare-specific safety backstop (Codex High finding). The shared
+// containsForbiddenAssertion() only catches "safe to sign"-style green-lights,
+// which is the right scope for single-document Explain — but Compare's central
+// forbidden move is a COMPARATIVE verdict: "the revised version is safer,"
+// "choose version 2," "the original is worse for you." A prompt injection
+// buried in a pasted version could coax the model into picking a side, and the
+// shared detector would not catch it. This adds a tightly-scoped second
+// detector for those verdicts only.
+//
+// Patterns are deliberately narrow — scoped to "<a version> is better/safer/
+// worse," "better/safer for you," "the safer/better one," and "choose/pick the
+// <x> version" — so ordinary descriptive language a comparison SHOULD produce
+// ("the revised version adds a better definition of confidential information,"
+// "this version is clearer about payment terms") is not flagged. As with the
+// shared detector, a rare false positive degrades to the safe fallback + a
+// nudge to see an attorney, which is the acceptable direction to fail for a
+// boundary-critical feature.
+const COMPARATIVE_VERDICT_PATTERNS: RegExp[] = [
+  // "Version 2 is better", "version B is the safer"
+  /\bversion\s+\S+\s+is\s+(the\s+)?(better|safer|worse|more favorable|less favorable)\b/i,
+  // "the revised version is safer", "the original is worse"
+  /\b(the\s+)?(revised|original|updated|new|old|first|second|latter|former)\s+(version\s+)?is\s+(the\s+)?(better|safer|worse|more favorable|less favorable)\b/i,
+  // "safer for you", "better for the founder"
+  /\b(better|safer|worse|more favorable|less favorable)\s+for\s+(you|your|the founder|the company)\b/i,
+  // "the safer version", "the better one", "the right choice"
+  /\bthe\s+(safer|better|worse|right|best)\s+(version|one|option|choice)\b/i,
+  // "I would choose the revised version", "you should go with the original"
+  /\b(i would|i'?d|you should|i recommend|i suggest)\s+(choose|pick|go with|prefer|sign|use|select)\b[^.]*\b(revised|original|updated|new|old|first|second|version)\b/i,
+  // "choose the revised version", "go with the original version"
+  /\b(choose|pick|go with|prefer|select)\s+(the\s+)?(revised|original|updated|new|old|first|second)\s+version\b/i,
+]
+
+// Same normalization ideas as lib/forbiddenAssertions.ts: strip markdown and
+// zero-width characters and collapse punctuation so a verdict split by emphasis
+// or an em dash still matches. (finalizeComparison already markdown-strips
+// before calling this, but normalizing here keeps the helper correct on its
+// own for direct callers and tests.)
+function normalizeForVerdict(text: string): string {
+  return text
+    .normalize('NFKC')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/[*_`#]+/g, '')
+    .replace(/[,;:—–-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+}
+
+export function containsComparativeVerdict(text: string): boolean {
+  const normalized = normalizeForVerdict(text)
+  return COMPARATIVE_VERDICT_PATTERNS.some((p) => p.test(normalized))
+}
+
 function stripAttemptedClosingLine(text: string): string {
   const lines = text.trim().split('\n')
   const last = lines[lines.length - 1]?.trim() ?? ''
@@ -85,7 +136,7 @@ function stripAttemptedClosingLine(text: string): string {
 export function finalizeComparison(raw: string): string {
   const stripped = stripMarkdownFormatting(raw)
   const body = stripAttemptedClosingLine(stripped)
-  if (containsForbiddenAssertion(body)) return SAFE_FALLBACK
+  if (containsForbiddenAssertion(body) || containsComparativeVerdict(body)) return SAFE_FALLBACK
   return `${body}\n\n${COMPARE_CLOSING_LINE}`
 }
 

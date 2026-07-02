@@ -1,11 +1,16 @@
 import { NextResponse } from 'next/server'
 import { compareDocuments } from '@/lib/compareDocuments'
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit'
-import { requireJsonContentType } from '@/lib/requestGuard'
+import { requireJsonContentType, readBodyWithLimit } from '@/lib/requestGuard'
 
 const COMPARE_RATE_LIMIT = 8
 const COMPARE_RATE_WINDOW_SECONDS = 60
 const MAX_INPUT_CHARS = 20000
+// Two documents of up to MAX_INPUT_CHARS each, plus JSON overhead. Cap the raw
+// body BEFORE parsing so a client can't force the server to buffer and parse an
+// arbitrarily large payload first (Codex finding; same guard chat/name-search
+// use). ~4 bytes/char headroom over the two-document character limit.
+const MAX_COMPARE_BODY_BYTES = MAX_INPUT_CHARS * 2 * 4 + 4096
 
 export async function POST(req: Request) {
   try {
@@ -27,7 +32,17 @@ export async function POST(req: Request) {
       )
     }
 
-    const body = (await req.json()) as unknown
+    const bodyResult = await readBodyWithLimit(req, MAX_COMPARE_BODY_BYTES)
+    if (bodyResult.error) {
+      return NextResponse.json({ error: bodyResult.error }, { status: 413 })
+    }
+
+    let body: unknown
+    try {
+      body = JSON.parse(bodyResult.text)
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 })
+    }
 
     // Reject bodies that aren't a plain JSON object (null, arrays, primitives)
     // with a 400 rather than letting a property access throw a 500 downstream.
