@@ -18,7 +18,12 @@ const TOPIC_RULES: TopicRule[] = [
     // asking what structure to use for a VC raise is exactly what this file
     // covers ("the standard structure expected by venture capital
     // investors"), but previously matched no keyword at all.
-    keywords: ['llc', 'c-corp', 'c corp', 's-corp', 's corp', 'sole proprietorship', 'partnership', 'incorporate', 'entity type', 'business structure', 'venture capital'],
+    // '83(b)' / '83b' / 'section 83' added (A3 inline citations): the file's
+    // C-Corp section mentions "83(b) election timing" and is the only
+    // reference file that touches it at all, but a direct "when is the 83b
+    // deadline" question previously matched no keyword, so it never got
+    // selected as grounding — meaning it could also never earn a citation.
+    keywords: ['llc', 'c-corp', 'c corp', 's-corp', 's corp', 'sole proprietorship', 'partnership', 'incorporate', 'entity type', 'business structure', 'venture capital', '83(b)', '83b', 'section 83'],
   },
   {
     file: 'liability-basics.md',

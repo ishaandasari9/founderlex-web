@@ -47,5 +47,18 @@ for (const id of codexFlaggedIds) {
   )
 }
 
+// A3 inline citations: business-structures.md is the only reference file
+// that mentions the 83(b) election, but a direct "when is the 83b deadline"
+// question previously matched no keyword at all, so the file never got
+// selected and the 83(b) citation (see lib/citations.ts) could never fire.
+check(
+  selectReferenceFiles(null, 'When is the 83(b) deadline?').includes('business-structures.md'),
+  'REGRESSION (A3): "When is the 83(b) deadline?" selects business-structures.md',
+)
+check(
+  selectReferenceFiles(null, "What's the deadline to file an 83b election?").includes('business-structures.md'),
+  'REGRESSION (A3): "83b" (no punctuation) also selects business-structures.md',
+)
+
 console.log(`\n${failures === 0 ? 'PASS' : 'FAIL'}: ${checks} checks run, ${failures} failed`)
 if (failures > 0) process.exit(1)
