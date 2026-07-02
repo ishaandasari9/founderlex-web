@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server'
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { getChatResponse, validateChatInput } from '@/lib/chat'
+import { getChatResponse, validateChatInput, isCannedSafeResponse } from '@/lib/chat'
 import { extractProfile } from '@/lib/extractProfile'
 import { validateProfile, describeProfile, type FounderProfile } from '@/lib/founderProfile'
 import { selectReferenceFiles } from '@/lib/selectReferences'
+import { selectCitations } from '@/lib/citations'
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit'
 import { requireJsonContentType, readBodyWithLimit } from '@/lib/requestGuard'
 
@@ -78,7 +79,14 @@ export async function POST(req: Request) {
     const referenceContext = buildReferenceContext(referenceFiles)
 
     const text = await getChatResponse(messages, founderName, buildingDesc, profileContext, referenceContext)
-    return NextResponse.json({ content: text, profile: updatedProfile })
+
+    // A3 inline citations: never attach a source link to a guard refusal or
+    // either safety fallback (CHAT_SAFE_FALLBACK / VERIFIER_SAFE_FALLBACK)
+    // — none of those actually cite a specific passage, and showing one
+    // anyway would be exactly the fabrication this feature exists to avoid.
+    const citations = isCannedSafeResponse(text) ? [] : selectCitations(referenceFiles, lastUserMessage)
+
+    return NextResponse.json({ content: text, profile: updatedProfile, citations })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
     console.error('[chat]', msg)

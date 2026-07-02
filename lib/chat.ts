@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { detectOutOfScope } from './outOfScopeGuard'
+import { detectOutOfScope, GUARD_CATEGORIES } from './outOfScopeGuard'
 import { containsForbiddenAssertion } from './forbiddenAssertions'
 import { runVerifiedAnswer, verifyAnswer, isSmallTalkDraft, logVerifierEvent } from './runtimeVerifier'
 
@@ -39,8 +39,13 @@ export type ChatMessage = { role: 'user' | 'assistant'; content: string }
 
 // Shown in place of a reply that trips the forbidden-assertion backstop
 // below (layer 4). Deliberately doesn't itself contain any risky
-// "safe/fine/sign" phrasing that could re-trigger the same check.
-const CHAT_SAFE_FALLBACK =
+// "safe/fine/sign" phrasing that could re-trigger the same check. Exported
+// (along with VERIFIER_SAFE_FALLBACK and GUARD_CATEGORIES' responses, via
+// isCannedSafeResponse below) so callers like app/api/chat/route.ts can
+// tell a genuine, verified answer apart from a canned safe response — A3's
+// citation feature must never attach a source link to a fallback that
+// didn't actually cite anything.
+export const CHAT_SAFE_FALLBACK =
   "I don't want to overstate that last answer, so let me back up: please don't treat what I just said as a guarantee, and check the specifics with a licensed attorney before relying on it."
 
 // Shown when the A2 runtime verifier (layer 3) flags a draft and the single
@@ -49,8 +54,22 @@ const CHAT_SAFE_FALLBACK =
 // from CHAT_SAFE_FALLBACK above so the two layers stay distinguishable if
 // ever inspected in logs, though both are equally safe, hedged, and never
 // show the flagged draft.
-const VERIFIER_SAFE_FALLBACK =
+export const VERIFIER_SAFE_FALLBACK =
   "I'm not fully confident in how I answered that, so I don't want to guess. Here's what I can say for certain: this is a real legal question worth getting right, so please check it with a licensed attorney rather than relying on my last answer."
+
+// True for any of the fixed, canned strings getChatResponse can return
+// instead of a genuine model-drafted answer: the five deterministic
+// out-of-scope guard responses (lib/outOfScopeGuard.ts) and the two safety
+// fallbacks above. None of these ever cite a specific reference passage —
+// a guard refusal never consulted one, and a fallback exists precisely
+// because the draft that WOULD have cited one got rejected — so this is
+// the single source of truth callers use to decide whether showing a
+// citation makes any sense at all (A3: "an unsupported claim shows no
+// source" applies just as much to a fallback as to a bad draft).
+export function isCannedSafeResponse(text: string): boolean {
+  if (text === CHAT_SAFE_FALLBACK || text === VERIFIER_SAFE_FALLBACK) return true
+  return GUARD_CATEGORIES.some((category) => category.response === text)
+}
 
 // Markdown/dash formatting only, no safety check — split out so the A2
 // runtime verifier (which needs the same display-ready text a reader would
