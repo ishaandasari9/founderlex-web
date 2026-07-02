@@ -6,10 +6,11 @@ import { extractProfile } from '@/lib/extractProfile'
 import { validateProfile, describeProfile, type FounderProfile } from '@/lib/founderProfile'
 import { selectReferenceFiles } from '@/lib/selectReferences'
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit'
-import { requireJsonContentType } from '@/lib/requestGuard'
+import { requireJsonContentType, readBodyWithLimit } from '@/lib/requestGuard'
 
 const CHAT_RATE_LIMIT = 20
 const CHAT_RATE_WINDOW_SECONDS = 60
+const MAX_CHAT_BODY_BYTES = 200_000
 
 const referenceCache = new Map<string, string>()
 
@@ -43,21 +44,34 @@ export async function POST(req: Request) {
       )
     }
 
-    const { messages, founderName, buildingDesc, profile } = await req.json() as {
-      messages: Parameters<typeof getChatResponse>[0]
+    const bodyResult = await readBodyWithLimit(req, MAX_CHAT_BODY_BYTES)
+    if (bodyResult.error) {
+      return NextResponse.json({ error: bodyResult.error }, { status: 413 })
+    }
+
+    let parsedBody: unknown
+    try {
+      parsedBody = JSON.parse(bodyResult.text)
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 })
+    }
+
+    const { messages: rawMessages, founderName, buildingDesc, profile } = parsedBody as {
+      messages?: unknown
       founderName?: string
       buildingDesc?: string
       profile?: FounderProfile | null
     }
 
-    const validationError = validateChatInput(messages)
-    if (validationError) {
-      return NextResponse.json({ error: validationError }, { status: 400 })
+    const chatInputValidation = validateChatInput(rawMessages)
+    if (!chatInputValidation.ok) {
+      return NextResponse.json({ error: chatInputValidation.error }, { status: 400 })
     }
+    const { messages } = chatInputValidation
 
     const updatedProfile = await extractProfile(messages, profile ?? null)
-    const validation = validateProfile(updatedProfile)
-    const profileContext = describeProfile(updatedProfile, validation)
+    const profileValidation = validateProfile(updatedProfile)
+    const profileContext = describeProfile(updatedProfile, profileValidation)
 
     const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user')?.content ?? ''
     const referenceFiles = selectReferenceFiles(updatedProfile.business_type, lastUserMessage)
