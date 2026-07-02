@@ -18,22 +18,22 @@ function WarmLights({ lite, openAmountRef }: { lite: boolean; openAmountRef: Rea
   const light = useRef<PointLight>(null)
   useFrame(() => {
     if (light.current) {
-      light.current.intensity = 0.4 + (openAmountRef.current ?? 0) * (lite ? 1.1 : 1.8)
+      light.current.intensity = 0.4 + (openAmountRef.current ?? 0) * 1.8
     }
   })
 
   return (
     <>
-      <ambientLight intensity={lite ? 0.78 : 0.62} color={WARM_LIGHT} />
+      <ambientLight intensity={0.62} color={WARM_LIGHT} />
       <directionalLight
         position={[2.2, 4.2, 2.8]}
-        intensity={lite ? 1.05 : 1.35}
+        intensity={1.35}
         color={WARM_LIGHT}
         castShadow={!lite}
         shadow-mapSize={lite ? [512, 512] : [1024, 1024]}
       />
       <directionalLight position={[-2.5, 2.2, 1.5]} intensity={0.28} color="#F0DCBC" />
-      <pointLight ref={light} position={[0, 0.8, -1.8]} color="#FFFDF8" distance={lite ? 5 : 7} />
+      <pointLight ref={light} position={[0, 0.8, -1.8]} color="#FFFDF8" distance={7} />
     </>
   )
 }
@@ -105,8 +105,8 @@ function CinematicRig({
   const consumedExit = useRef(0)
   const [canInteract, setCanInteract] = useState(true)
 
-  const camStart = { x: 0, y: 0.12, z: lite ? 3.5 : 3.2 }
-  const camEnd = { x: 0, y: 0.05, z: lite ? -0.3 : -0.5 }
+  const camStart = { x: 0, y: 0.12, z: 3.2 }
+  const camEnd = { x: 0, y: 0.05, z: -0.5 }
 
   const applyAt = useCallback((t: number) => {
     applyFrame(t, lite, openAmount, camera, camStart, camEnd, direction.current)
@@ -174,7 +174,7 @@ function CinematicRig({
   return (
     <>
       <color attach="background" args={[CREAM]} />
-      <fog attach="fog" args={[CREAM, lite ? 3.5 : 4, lite ? 8 : 10]} />
+      <fog attach="fog" args={[CREAM, 4, 10]} />
       <WarmLights lite={lite} openAmountRef={openAmount} />
       <DoorModel
         openAmountRef={openAmount}
@@ -238,7 +238,7 @@ export default function DoorScene3D({
           alpha: false,
           powerPreference: lite ? 'low-power' : 'high-performance',
         }}
-        camera={{ fov: 42, near: 0.1, far: 20, position: [0, 0.12, lite ? 3.5 : 3.2] }}
+        camera={{ fov: 42, near: 0.1, far: 20, position: [0, 0.12, 3.2] }}
         onCreated={({ gl }) => {
           gl.domElement.addEventListener('webglcontextlost', e => {
             e.preventDefault()
