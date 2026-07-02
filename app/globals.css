@@ -791,10 +791,9 @@ input { font-family: inherit; }
 
 @media (prefers-reduced-motion: reduce) {
   .doc-marquee-track {
-    animation: none;
-    flex-wrap: wrap;
-    width: 100%;
-    justify-content: center;
+    animation-duration: 48s !important;
+    animation-iteration-count: infinite !important;
+    animation-timing-function: linear !important;
   }
 
   .glass-card {

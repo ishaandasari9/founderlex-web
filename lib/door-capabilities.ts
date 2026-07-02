@@ -1,24 +1,5 @@
 export type DoorRenderMode = '3d' | '3d-lite' | '2d'
 
-function canUseWebGL(): boolean {
-  if (typeof window === 'undefined') return false
-  try {
-    const canvas = document.createElement('canvas')
-    const ctx =
-      canvas.getContext('webgl2') ??
-      canvas.getContext('webgl') ??
-      canvas.getContext('experimental-webgl')
-    return !!ctx
-  } catch {
-    return false
-  }
-}
-
-function prefersReducedMotion(): boolean {
-  if (typeof window === 'undefined') return false
-  return window.matchMedia('(prefers-reduced-motion: reduce)').matches
-}
-
 function deviceMemoryGb(): number | null {
   const nav = navigator as Navigator & { deviceMemory?: number }
   return typeof nav.deviceMemory === 'number' ? nav.deviceMemory : null
@@ -36,10 +17,8 @@ function isVeryLowPower(): boolean {
   return false
 }
 
-/** Client-only: pick 3D full, 3D lite, or 2D fallback. */
+/** Client-only: pick 3D full or 3D lite. Always attempts WebGL — 2D is only used at runtime if the context is lost. */
 export function getDoorRenderMode(): DoorRenderMode {
-  if (prefersReducedMotion()) return '2d'
-  if (!canUseWebGL()) return '2d'
   if (isVeryLowPower()) return '3d-lite'
   return '3d'
 }

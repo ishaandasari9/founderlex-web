@@ -11,6 +11,7 @@ const CREAM = '#F7F2EB'
 const WARM_LIGHT = '#FFF8EE'
 
 const DURATION = { full: 2.0, lite: 1.6 } as const
+const INSTANT_TRANSITION_MS = 100
 
 type TransitionDir = 'enter' | 'exit'
 
@@ -103,7 +104,16 @@ function CinematicRig({
   const direction = useRef<TransitionDir | null>(null)
   const consumedEnter = useRef(0)
   const consumedExit = useRef(0)
+  const reducedMotionRef = useRef(false)
   const [canInteract, setCanInteract] = useState(true)
+
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const update = () => { reducedMotionRef.current = mq.matches }
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [])
 
   const camStart = { x: 0, y: 0.12, z: 3.2 }
   const camEnd = { x: 0, y: 0.05, z: -0.5 }
@@ -123,6 +133,36 @@ function CinematicRig({
 
   const startTransition = useCallback((dir: TransitionDir) => {
     if (active.current) return
+
+    if (reducedMotionRef.current) {
+      direction.current = dir
+      active.current = true
+      setCanInteract(false)
+      progress.current = dir === 'enter' ? 1 : 0
+      applyAt(progress.current)
+      onTransitionStart?.()
+      onAnimatingChange?.(true)
+
+      window.setTimeout(() => {
+        if (dir === 'enter') {
+          if (enterSignal > consumedEnter.current) {
+            consumedEnter.current = enterSignal
+          }
+          active.current = false
+          direction.current = null
+          onAnimatingChange?.(false)
+          onEnterApp()
+        } else {
+          if (exitSignal > consumedExit.current) {
+            consumedExit.current = exitSignal
+          }
+          finishIdle()
+          onExitComplete()
+        }
+      }, INSTANT_TRANSITION_MS)
+      return
+    }
+
     direction.current = dir
     active.current = true
     setCanInteract(false)
@@ -130,7 +170,7 @@ function CinematicRig({
     applyAt(progress.current)
     onTransitionStart?.()
     onAnimatingChange?.(true)
-  }, [applyAt, onAnimatingChange, onTransitionStart])
+  }, [applyAt, onAnimatingChange, onTransitionStart, onEnterApp, onExitComplete, finishIdle, enterSignal, exitSignal])
 
   // Pick up new enter/exit signals
   useEffect(() => {
@@ -146,6 +186,8 @@ function CinematicRig({
   }, [exitSignal, startTransition])
 
   useFrame((_, delta) => {
+    if (reducedMotionRef.current) return
+
     const dir = direction.current
     if (!active.current || !dir) return
 

@@ -22,12 +22,6 @@ export default function DocumentMarquee({ items }: DocumentMarqueeProps) {
     const track = trackRef.current
     if (!track) return
 
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    if (reduced) {
-      track.style.animationPlayState = 'paused'
-      return
-    }
-
     const pause = () => { track.style.animationPlayState = 'paused' }
     const resume = () => { track.style.animationPlayState = 'running' }
 

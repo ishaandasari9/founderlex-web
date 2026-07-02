@@ -4,7 +4,6 @@ import React, { useEffect, useRef, useState, Suspense } from 'react'
 import dynamic from 'next/dynamic'
 import {
   getDoorRenderMode,
-  subscribeReducedMotion,
   type DoorRenderMode,
 } from '../../lib/door-capabilities'
 import DoorInside2D from './DoorInside2D'
@@ -130,9 +129,6 @@ export default function DoorHero({
 
   useEffect(() => {
     setMode(getDoorRenderMode())
-    return subscribeReducedMotion(reduced => {
-      if (reduced) setForce2D(true)
-    })
   }, [])
 
   if (mode === null) {
