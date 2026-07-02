@@ -195,6 +195,7 @@ export async function POST(req: Request) {
       docx_name: `${slug}-${filename}.docx`,
       pdf_b64:   pdfBuf.toString('base64'),
       pdf_name:  `${slug}-${filename}.pdf`,
+      filled,
     })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)

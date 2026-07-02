@@ -8,8 +8,10 @@ import {
 } from 'lucide-react'
 import { validateProfile, emptyProfile, type FounderProfile } from '@/lib/founderProfile'
 import type { ConfirmField } from '@/lib/confirmationFields'
+import { buildLawyerReviewEmail, type GeneratedDoc } from '@/lib/lawyerReviewEmail'
 import ConfirmDocPanel, { type ConfirmPanelState } from '@/components/ConfirmDocPanel'
 import ConsentGate from '@/components/ConsentGate'
+import LawyerReviewEmailPanel from '@/components/LawyerReviewEmailPanel'
 
 // ── React Bits — SSR disabled (motion/react needs window) ────────────────────
 // Cast to any to bypass TypeScript inference quirks from .jsx component files
@@ -119,7 +121,7 @@ function detectTemplate(text: string): string | null {
 async function generateAndDownload(
   templateName: string,
   profile: FounderProfile | null
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; filled?: string }> {
   try {
     const res = await fetch('/api/generate', {
       method: 'POST',
@@ -140,7 +142,7 @@ async function generateAndDownload(
     }
     if (data.pdf_b64)  dl(data.pdf_b64,  data.pdf_name  || 'document.pdf',  'application/pdf')
     if (data.docx_b64) dl(data.docx_b64, data.docx_name || 'document.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
-    return { ok: true }
+    return { ok: true, filled: data.filled }
   } catch (e: unknown) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
   }
@@ -376,9 +378,11 @@ export default function Home() {
   const [profile, setProfile]       = useState<FounderProfile | null>(null)
   const profileRef                  = useRef<FounderProfile | null>(null)
   const [docCount, setDocCount]     = useState(0)
+  const [generatedDocs, setGeneratedDocs] = useState<GeneratedDoc[]>([])
   const [generatingTpl, setGeneratingTpl] = useState<string | null>(null)
   const [confirmPanel, setConfirmPanel]   = useState<ConfirmPanelState | null>(null)
   const [confirmGenerating, setConfirmGenerating] = useState(false)
+  const [lawyerEmail, setLawyerEmail]     = useState<string | null>(null)
   const [enterSignal, setEnterSignal]     = useState(0)
   const [exitSignal, setExitSignal]       = useState(0)
   const [doorBusy, setDoorBusy]           = useState(false)
@@ -513,12 +517,25 @@ export default function Home() {
     setConfirmGenerating(false)
     if (result.ok) {
       setDocCount(prev => prev + 1)
+      setGeneratedDocs(prev => [
+        ...prev,
+        {
+          template: confirmPanel.template,
+          label: TEMPLATE_LABELS[confirmPanel.template] ?? confirmPanel.template,
+          filled: result.filled ?? '',
+        },
+      ])
       setConfirmPanel(null)
     } else {
       alert(`Could not generate document: ${result.error ?? 'Unknown error'}`)
     }
   }, [confirmPanel])
 
+  const handleOpenLawyerEmail = useCallback(() => {
+    setLawyerEmail(buildLawyerReviewEmail(profileRef.current ?? emptyProfile(), generatedDocs))
+  }, [generatedDocs])
+
+  const handleCloseLawyerEmail = useCallback(() => setLawyerEmail(null), [])
 
   const handleStepInside = useCallback(() => {
     if (act !== 'door' || doorBusy) return
@@ -826,6 +843,16 @@ export default function Home() {
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3F9D6A', flexShrink: 0 }} />
                 Here with you
               </span>
+              {generatedDocs.length > 0 && (
+                <button onClick={handleOpenLawyerEmail}
+                  className="chat-clear-btn"
+                  style={{
+                    fontFamily: MONO, fontSize: 10, letterSpacing: '0.10em', textTransform: 'uppercase',
+                    color: RED, background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                  }}>
+                  Email a lawyer
+                </button>
+              )}
               {messages.length > 0 && (
                 <button onClick={handleClearSession}
                   className="chat-clear-btn"
@@ -932,6 +959,14 @@ export default function Home() {
           onChange={setConfirmPanel}
           onCancel={handleCancelConfirm}
           onConfirm={handleConfirmGenerate}
+        />
+      )}
+
+      {lawyerEmail !== null && (
+        <LawyerReviewEmailPanel
+          email={lawyerEmail}
+          onChange={setLawyerEmail}
+          onClose={handleCloseLawyerEmail}
         />
       )}
     </div>

@@ -387,6 +387,15 @@ input { font-family: inherit; }
   box-shadow: 0 0 0 3px rgba(219, 26, 26, 0.1);
 }
 
+.confirm-panel-textarea {
+  min-height: 340px;
+  resize: vertical;
+  font-family: var(--font-mono), monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
 .confirm-panel-founders {
   display: flex;
   flex-direction: column;

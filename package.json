@@ -10,7 +10,8 @@
     "stress": "npx tsx tests/stress-runner.ts",
     "test:edge-cases": "npx tsx tests/edge-case-runner.ts",
     "test:profile": "npx tsx tests/founderProfile.test.ts",
-    "test:template": "npx tsx tests/renderTemplate.test.ts"
+    "test:template": "npx tsx tests/renderTemplate.test.ts",
+    "test:lawyer-email": "npx tsx tests/lawyerReviewEmail.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",
