@@ -29,7 +29,8 @@
     "test:text-formatting": "npx tsx tests/textFormatting.test.ts",
     "test:deadlines": "npx tsx tests/deadlineReminders.test.ts",
     "test:cost-estimate": "npx tsx tests/costEstimator.test.ts",
-    "test:compare": "npx tsx tests/compareDocuments.test.ts"
+    "test:compare": "npx tsx tests/compareDocuments.test.ts",
+    "test:roadmap": "npx tsx tests/foundingRoadmap.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",
