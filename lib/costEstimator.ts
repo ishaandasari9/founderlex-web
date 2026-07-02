@@ -16,7 +16,6 @@ import type { BusinessType } from './founderProfile'
 
 export type CostSituation =
   | 'has_equity' // multiple founders / equity worth papering
-  | 'delaware' // incorporated (or considering) in Delaware
   | 'accepting_donations' // nonprofit soliciting charitable contributions
   | 'trademark' // wants to protect a brand name / logo
   | 'hiring' // has or plans to have employees
@@ -79,7 +78,7 @@ const COST_ITEMS: CostItem[] = [
     professionalCost:
       'Some small nonprofits complete the 1023-EZ themselves; the full Form 1023 is substantial, and many organizations use a nonprofit attorney or specialist, which can run into the hundreds or low thousands depending on complexity.',
     typicalTime:
-      'The 1023-EZ is often processed in a matter of weeks to a couple of months; the full 1023 commonly takes several months.',
+      'Processing time varies with the IRS’s current backlog. The streamlined 1023-EZ is often faster (frequently weeks to a couple of months) and the full 1023 typically takes longer (often several months or more) — check the IRS’s current processing status rather than treating these as guarantees.',
     notes:
       'Not every organization is eligible for the shorter 1023-EZ — eligibility depends on projected revenue and other factors. Check the current eligibility worksheet.',
     verifyAt: 'irs.gov and a nonprofit attorney or CPA',
@@ -135,10 +134,9 @@ const COST_ITEMS: CostItem[] = [
       'Often handled by you or your CPA/registered agent as part of routine compliance; a service may bundle it into an annual fee.',
     typicalTime: 'Filed on a recurring (often annual) schedule set by the state.',
     notes:
-      'Delaware’s default franchise tax calculation can produce a surprisingly large first bill; an alternate calculation method often lowers it. Check both.',
+      'Almost every state charges something recurring to keep an entity in good standing, so budget for it wherever you form. As one example, Delaware’s default franchise tax calculation can produce a surprisingly large first bill; an alternate calculation method often lowers it, so check both.',
     verifyAt: 'your state’s Secretary of State and a CPA',
     appliesTo: ['product', 'consulting', 'nonprofit'],
-    situations: ['delaware'],
   },
   {
     id: 'charitable_registration',

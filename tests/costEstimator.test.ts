@@ -63,10 +63,11 @@ const cases: Case[] = [
       ids('product', ['has_equity']).includes('founders_agreement'),
   },
   {
-    name: 'annual/franchise fees only surface when Delaware situation is active',
+    name: 'annual/recurring state fees are universal (all business types), not Delaware-gated',
     run: () =>
-      !ids('product').includes('annual_state_fees') &&
-      ids('product', ['delaware']).includes('annual_state_fees'),
+      (['product', 'consulting', 'nonprofit'] as const).every((t) =>
+        ids(t).includes('annual_state_fees'),
+      ),
   },
   {
     name: 'payroll setup only surfaces when hiring',

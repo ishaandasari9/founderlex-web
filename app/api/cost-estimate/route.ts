@@ -10,7 +10,6 @@ const COST_RATE_WINDOW_SECONDS = 60
 const VALID_BUSINESS_TYPES: BusinessType[] = ['product', 'consulting', 'nonprofit']
 const VALID_SITUATIONS: CostSituation[] = [
   'has_equity',
-  'delaware',
   'accepting_donations',
   'trademark',
   'hiring',
@@ -49,9 +48,10 @@ export async function POST(req: Request) {
       situations?: unknown
     }
 
-    // Validate strictly: an unrecognized business type becomes "unknown" (null),
-    // and only allowlisted situation tags survive, so a malformed request can't
-    // smuggle in unexpected filtering behavior.
+    // Validate against an allowlist. Unrecognized values are not errors: an
+    // unknown business type falls back to "unknown" (null) and unknown
+    // situation tags are dropped, so a malformed request can't smuggle in
+    // unexpected filtering behavior — it just yields the safe general set.
     const businessType =
       typeof rawBusinessType === 'string' &&
       VALID_BUSINESS_TYPES.includes(rawBusinessType as BusinessType)
