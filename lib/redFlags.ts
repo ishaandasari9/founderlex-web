@@ -1,4 +1,5 @@
 import { GUARD_CATEGORIES } from './outOfScopeGuard'
+import { containsForbiddenAssertion } from './forbiddenAssertions'
 
 export interface RedFlag {
   id: string
@@ -148,4 +149,27 @@ export function detectRedFlags(text: string): RedFlag[] {
   }
 
   return flags
+}
+
+// detectRedFlags above only scans the user's own input. Nothing previously
+// checked what the assistant itself says — a jailbreak that got the model to
+// confidently declare something "legally fine" would sail through
+// undetected. This is intentionally separate from detectRedFlags rather than
+// folded into it: detectRedFlags matches on topic keywords (e.g. "advisor
+// equity"), which the assistant legitimately says all the time while doing
+// its job correctly, so running the same category patterns against bot
+// replies would just be noisy. This instead reuses the same forbidden-
+// assertion patterns explainForm.ts uses to catch confident sign/safety
+// verdicts specifically, and surfaces a warning card without altering the
+// reply itself, since chat has much broader legitimate scope than the
+// single-purpose Explain feature (full reply replacement there is
+// appropriate; here it would risk collateral damage to normal conversation).
+export function checkAssistantOverstep(replyText: string): RedFlag | null {
+  if (!containsForbiddenAssertion(replyText)) return null
+  return {
+    id: 'assistant_overstep',
+    label: 'This reply may have overstepped',
+    whyItMatters: 'FounderLex should only explain and flag, never declare something legally fine or safe to sign. This reply used language that sounds like a verdict, which should not happen. Treat it with extra caution and do not rely on it as confirmation that anything is safe.',
+    talkTo: 'a licensed attorney, regardless of what this reply said',
+  }
 }

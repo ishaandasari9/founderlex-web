@@ -1,4 +1,4 @@
-import { detectRedFlags } from '../lib/redFlags'
+import { detectRedFlags, checkAssistantOverstep } from '../lib/redFlags'
 import { GUARD_CATEGORIES } from '../lib/outOfScopeGuard'
 
 interface Case {
@@ -89,6 +89,29 @@ const cases: Case[] = [
         const phrase = triggerPhrases[category.id]
         return !!phrase && flagIds(phrase).includes(category.id)
       })
+    },
+  },
+  {
+    name: 'SECURITY: checkAssistantOverstep flags a jailbroken reply that declares something safe to sign',
+    run: () => {
+      const flag = checkAssistantOverstep('Yes, based on what you described, this is safe to sign and you can go ahead.')
+      return flag !== null && flag.id === 'assistant_overstep'
+    },
+  },
+  {
+    name: 'checkAssistantOverstep returns null for a normal, appropriately-scoped reply',
+    run: () => {
+      const reply = "A Founders' Agreement locks in your equity split and vesting schedule before you build anything. Are both co-founders full-time from day one?"
+      return checkAssistantOverstep(reply) === null
+    },
+  },
+  {
+    name: 'checkAssistantOverstep does not flag a reply that correctly mentions a red-flag topic without giving a verdict',
+    run: () => {
+      // Mentioning "advisor equity" or "securities law" is the assistant doing
+      // its job correctly — only a confident sign/safety verdict should flag.
+      const reply = 'Issuing advisor equity touches securities law, so you should talk to a startup attorney before finalizing anything.'
+      return checkAssistantOverstep(reply) === null
     },
   },
 ]

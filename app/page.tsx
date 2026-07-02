@@ -17,7 +17,7 @@ import ReadAloudButton from '@/components/ReadAloudButton'
 import MicButton from '@/components/MicButton'
 import ExplainFormPanel from '@/components/ExplainFormPanel'
 import RedFlagCard from '@/components/RedFlagCard'
-import { detectRedFlags, type RedFlag } from '@/lib/redFlags'
+import { detectRedFlags, checkAssistantOverstep, type RedFlag } from '@/lib/redFlags'
 import BeforeYouSignChecklist from '@/components/BeforeYouSignChecklist'
 
 // ── React Bits — SSR disabled (motion/react needs window) ────────────────────
@@ -479,7 +479,9 @@ export default function Home() {
       if (tpl) result.push({ role: 'doc-card', text: '', template: tpl })
 
       const flags = detectRedFlags(t)
-      if (flags.length > 0) result.push({ role: 'redflag-card', text: '', flags })
+      const overstep = checkAssistantOverstep(reply)
+      const allFlags = overstep ? [...flags, overstep] : flags
+      if (allFlags.length > 0) result.push({ role: 'redflag-card', text: '', flags: allFlags })
 
       setMessages(result)
       persistSession(result, updatedProfile)

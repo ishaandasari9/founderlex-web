@@ -1,6 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { getSystemPrompt } from './chat'
 import { detectOutOfScope } from './outOfScopeGuard'
+import { containsForbiddenAssertion } from './forbiddenAssertions'
+
+export { containsForbiddenAssertion } from './forbiddenAssertions'
 
 let _client: Anthropic | null = null
 function getClient(): Anthropic {
@@ -44,23 +47,6 @@ End your reply with exactly this sentence, verbatim, and nothing after it: "${EX
 export function wrapUntrustedDocument(text: string): string {
   const neutralized = text.replace(new RegExp(`</?${DOCUMENT_TAG}>`, 'gi'), '[removed matching tag]')
   return `<${DOCUMENT_TAG}>\n${neutralized}\n</${DOCUMENT_TAG}>`
-}
-
-// Defense in depth: even with the prompt above, an LLM reply is never
-// guaranteed. If the model's own words slip past the hard boundary, we don't
-// try to surgically edit prose — we replace the whole reply with a safe one.
-const FORBIDDEN_ASSERTION_PATTERNS: RegExp[] = [
-  /you should sign/i,
-  /(is|looks|seems|appears)\s+(legally\s+)?(fine|safe|okay|ok)\s+to\s+sign/i,
-  /safe\s+(for\s+you\s+)?to\s+sign/i,
-  /this\s+is\s+legally\s+(fine|sound|safe|okay|ok)/i,
-  /(go ahead|okay|ok|fine|safe)\s+to\s+(sign|proceed)/i,
-  /you\s+can\s+(safely\s+)?sign/i,
-  /no\s+(need|reason)\s+to\s+(worry|consult|see a lawyer)/i,
-]
-
-export function containsForbiddenAssertion(text: string): boolean {
-  return FORBIDDEN_ASSERTION_PATTERNS.some((p) => p.test(text))
 }
 
 const SAFE_FALLBACK =
