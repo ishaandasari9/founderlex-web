@@ -24,6 +24,7 @@ import RedFlagCard from '@/components/RedFlagCard'
 import { detectRedFlags, checkAssistantOverstep, type RedFlag } from '@/lib/redFlags'
 import BeforeYouSignChecklist from '@/components/BeforeYouSignChecklist'
 import CitationChip, { type CitationLink } from '@/components/CitationChip'
+import { TEMPLATE_LABELS, detectTemplate } from '@/lib/templateMeta'
 
 // ── React Bits — SSR disabled (motion/react needs window) ────────────────────
 // Cast to any to bypass TypeScript inference quirks from .jsx component files
@@ -87,50 +88,11 @@ const BRICOLAGE  = 'var(--font-bricolage), sans-serif'
 const NEWSREADER = 'var(--font-newsreader), Georgia, serif'
 const MONO       = 'var(--font-mono), monospace'
 
-// ── Template metadata ─────────────────────────────────────────────────────────
-const TEMPLATE_LABELS: Record<string, string> = {
-  founders_agreement: "Founders' Agreement",
-  contractor_agreement: 'Contractor Agreement',
-  unilateral_nda: 'Unilateral NDA',
-  mutual_nda: 'Mutual NDA',
-  advisor_agreement: 'Advisor Agreement',
-  terms_of_service: 'Terms of Service',
-  privacy_policy: 'Privacy Policy',
-  consulting_agreement: 'Consulting Agreement',
-  master_services_agreement: 'Master Services Agreement',
-  sow_template: 'Statement of Work',
-  independent_contractor_consulting: 'Independent Contractor Agreement',
-  nonprofit_articles: 'Articles of Incorporation',
-  nonprofit_bylaws: 'Nonprofit Bylaws',
-  nonprofit_conflict_of_interest: 'Conflict of Interest Policy',
-  donation_acknowledgment_letter: 'Donation Acknowledgment Letter',
-}
-
-const TEMPLATE_KEYWORDS: Record<string, string[]> = {
-  advisor_agreement: ['advisor agreement', 'advisory agreement'],
-  founders_agreement: ["founders' agreement", "founder agreement", "equity split", "vesting schedule", "founders agreement"],
-  contractor_agreement: ['contractor agreement', 'freelancer agreement', 'work for hire'],
-  unilateral_nda: ['unilateral nda', 'one-way nda', 'unilateral non-disclosure', 'one-way non-disclosure'],
-  mutual_nda: ['non-disclosure agreement', 'confidentiality agreement', 'mutual nda'],
-  terms_of_service: ['terms of service', 'terms and conditions'],
-  privacy_policy: ['privacy policy'],
-  consulting_agreement: ['consulting agreement'],
-  master_services_agreement: ['master services agreement', 'master service agreement'],
-  sow_template: ['statement of work'],
-  independent_contractor_consulting: ['independent contractor agreement'],
-  nonprofit_articles: ['articles of incorporation', 'nonprofit articles'],
-  nonprofit_bylaws: ['nonprofit bylaws', 'nonprofit by-laws'],
-  nonprofit_conflict_of_interest: ['conflict of interest policy'],
-  donation_acknowledgment_letter: ['donation acknowledgment letter', 'donation acknowledgement letter', 'donation receipt letter'],
-}
-
-function detectTemplate(text: string): string | null {
-  const lower = text.toLowerCase()
-  for (const [template, keywords] of Object.entries(TEMPLATE_KEYWORDS)) {
-    if (keywords.some(kw => lower.includes(kw))) return template
-  }
-  return null
-}
+// Template metadata (labels, keyword detection) now lives in
+// lib/templateMeta.ts — B2 needs it server-side too, to resolve
+// FounderProfile.recommended_documents (free text) down to template_name
+// keys, using the exact same keyword list this file already used for
+// doc-card detection, not a second copy.
 
 // ── Download helper ───────────────────────────────────────────────────────────
 async function generateAndDownload(
