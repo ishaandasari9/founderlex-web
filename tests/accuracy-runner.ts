@@ -1,11 +1,13 @@
 // A1 accuracy benchmark runner (README-v3-trust-and-delivery.md, Part A, A1).
-// Sends every question in accuracy-dataset.ts through the real assistant
-// pipeline (lib/chat.ts's getChatResponse, same code path app/api/chat/route.ts
-// uses, including the deterministic lib/outOfScopeGuard.ts pre-filter) and
-// scores each answer with an LLM judge against expected_key_points /
-// must_not_say / in_scope. Reports overall accuracy %, a per-question
-// pass/fail list, and — per the A1 acceptance tests — accuracy with vs.
-// without reference grounding.
+// Sends every question in accuracy-dataset.ts through the SAME pipeline
+// app/api/chat/route.ts runs for a live request — validateChatInput →
+// extractProfile → validateProfile → describeProfile → selectReferenceFiles
+// → getChatResponse (including the deterministic lib/outOfScopeGuard.ts
+// pre-filter and the finalizeChatResponse output backstop) — and scores each
+// answer with an LLM judge against expected_key_points / must_not_say /
+// in_scope. Reports overall accuracy %, a per-question pass/fail list, and —
+// per the A1 acceptance tests — accuracy with vs. without reference
+// grounding.
 import { readFileSync, existsSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import Anthropic from '@anthropic-ai/sdk'
@@ -24,7 +26,9 @@ if (existsSync(envFile)) {
   }
 }
 
-import { getChatResponse, type ChatMessage } from '../lib/chat'
+import { getChatResponse, validateChatInput } from '../lib/chat'
+import { extractProfile } from '../lib/extractProfile'
+import { validateProfile, describeProfile } from '../lib/founderProfile'
 import { selectReferenceFiles } from '../lib/selectReferences'
 import { ACCURACY_DATASET, type AccuracyCase } from './accuracy-dataset'
 import { computeExitCode } from './accuracyScoring'
@@ -96,6 +100,7 @@ Did the actual response meet the bar above? Reply with JSON only, no other text:
 // ── Per-question run ──────────────────────────────────────────────────────────
 interface CaseResult {
   item: AccuracyCase
+  businessType: string | null
   referenceFiles: string[]
   groundedResponse: string
   groundedVerdict: Verdict
@@ -103,12 +108,30 @@ interface CaseResult {
   ungroundedVerdict: Verdict
 }
 
+// Runs the SAME steps app/api/chat/route.ts runs for a real request
+// (extractProfile → validateProfile → describeProfile → selectReferenceFiles
+// → getChatResponse), rather than calling getChatResponse directly with a
+// hand-picked business_type. Codex audit finding: the previous version
+// skipped extractProfile/validateProfile entirely and always passed
+// business_type=null into selectReferenceFiles, so the accuracy number
+// didn't reflect what a real user actually hits — a question that mentions
+// "our nonprofit" or "my consulting firm" gets its business_type extracted
+// and can additionally pull in a reference file via
+// selectReferenceFiles's BUSINESS_TYPE_DEFAULT fallback, which this runner
+// was silently never exercising.
 async function runCase(item: AccuracyCase): Promise<CaseResult> {
-  const messages: ChatMessage[] = [{ role: 'user', content: item.question }]
-  const referenceFiles = selectReferenceFiles(null, item.question)
+  const validation = validateChatInput([{ role: 'user', content: item.question }])
+  if (!validation.ok) throw new Error(`${item.id}: ${validation.error}`)
+  const { messages } = validation
+
+  const profile = await extractProfile(messages, null)
+  const profileValidation = validateProfile(profile)
+  const profileContext = describeProfile(profile, profileValidation)
+
+  const referenceFiles = selectReferenceFiles(profile.business_type, item.question)
   const referenceContext = buildReferenceContext(referenceFiles)
 
-  const groundedResponse = await getChatResponse(messages, undefined, undefined, undefined, referenceContext)
+  const groundedResponse = await getChatResponse(messages, undefined, undefined, profileContext, referenceContext)
   const groundedVerdict = await judgeAnswer(item, groundedResponse)
 
   // Out-of-scope rows are guard-shortcircuited in getChatResponse before the
@@ -117,6 +140,7 @@ async function runCase(item: AccuracyCase): Promise<CaseResult> {
   if (!item.in_scope) {
     return {
       item,
+      businessType: profile.business_type,
       referenceFiles,
       groundedResponse,
       groundedVerdict,
@@ -125,10 +149,21 @@ async function runCase(item: AccuracyCase): Promise<CaseResult> {
     }
   }
 
-  const ungroundedResponse = await getChatResponse(messages)
+  // The ungrounded ablation isolates reference material specifically (per
+  // the A1 "with vs. without grounding" acceptance test): same validated
+  // profile/profileContext as the grounded run, just no referenceContext.
+  const ungroundedResponse = await getChatResponse(messages, undefined, undefined, profileContext)
   const ungroundedVerdict = await judgeAnswer(item, ungroundedResponse)
 
-  return { item, referenceFiles, groundedResponse, groundedVerdict, ungroundedResponse, ungroundedVerdict }
+  return {
+    item,
+    businessType: profile.business_type,
+    referenceFiles,
+    groundedResponse,
+    groundedVerdict,
+    ungroundedResponse,
+    ungroundedVerdict,
+  }
 }
 
 // ── Report ─────────────────────────────────────────────────────────────────────
@@ -152,7 +187,7 @@ function buildReport(results: CaseResult[]): string {
     '',
     `**Run date:** ${new Date().toUTCString()}`,
     `**Dataset:** ${total} realistic founder questions (${inScopeResults.length} in-scope, ${outOfScopeResults.length} out-of-scope), drafted from the primary-source reference files in \`skill/references/\`. See \`tests/accuracy-dataset.ts\`.`,
-    `**Run against:** the real assistant pipeline (\`lib/chat.ts\`'s \`getChatResponse\`, the same code path \`app/api/chat/route.ts\` uses, including the deterministic \`lib/outOfScopeGuard.ts\` pre-filter). Scoring is by an LLM judge (Claude Haiku) against each question's \`expected_key_points\` / \`must_not_say\` / \`in_scope\`.`,
+    `**Run against:** the real assistant pipeline — the same steps \`app/api/chat/route.ts\` runs for a live request: \`validateChatInput\` → \`extractProfile\` → \`validateProfile\` → \`describeProfile\` → \`selectReferenceFiles\` (using the extracted \`business_type\`, not a hardcoded null) → \`getChatResponse\` (including the deterministic \`lib/outOfScopeGuard.ts\` pre-filter and the \`finalizeChatResponse\` output backstop). Scoring is by an LLM judge (Claude Haiku) against each question's \`expected_key_points\` / \`must_not_say\` / \`in_scope\`.`,
     '',
     '## Headline numbers',
     '',
@@ -164,15 +199,16 @@ function buildReport(results: CaseResult[]): string {
     '',
     '## Per-question results',
     '',
-    '| # | Question | Scope | Reference file(s) selected | Grounded | Ungrounded |',
-    '|---|---|---|---|---|---|',
+    '| # | Question | Scope | Extracted business_type | Reference file(s) selected | Grounded | Ungrounded |',
+    '|---|---|---|---|---|---|---|',
     ...results.map((r) => {
       const q = r.item.question.length > 70 ? r.item.question.slice(0, 67) + '...' : r.item.question
       const scope = r.item.in_scope ? 'in-scope' : 'out-of-scope'
+      const businessType = r.businessType ?? '(none)'
       const files = r.referenceFiles.length ? r.referenceFiles.join(', ') : '(none selected)'
       const g = r.groundedVerdict.pass ? '✅' : '❌'
       const u = r.item.in_scope ? (r.ungroundedVerdict.pass ? '✅' : '❌') : '—'
-      return `| ${r.item.id} | ${q.replace(/\|/g, '\\|')} | ${scope} | ${files} | ${g} | ${u} |`
+      return `| ${r.item.id} | ${q.replace(/\|/g, '\\|')} | ${scope} | ${businessType} | ${files} | ${g} | ${u} |`
     }),
     '',
     '## Failures (evidence detail)',
