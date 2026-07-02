@@ -65,6 +65,21 @@ const BUSINESS_TYPE_DEFAULT: Partial<Record<BusinessType, string>> = {
   nonprofit: 'nonprofit-basics.md',
 }
 
+const ALL_TOPIC_KEYWORDS: string[] = TOPIC_RULES.flatMap((rule) => rule.keywords)
+
+// Reused by lib/runtimeVerifier.ts to decide whether an assistant DRAFT is
+// substantive enough to need A2 verification (Codex audit: the verifier was
+// previously gated on the latest USER message, so a short reply like "yes"
+// in an otherwise substantive conversation was misclassified as small talk
+// and skipped verification entirely). Deliberately reuses this exact
+// keyword set rather than a separate list, so "does this text touch a
+// legal topic" stays defined in one place. Same substring-match semantics
+// as selectReferenceFiles above.
+export function containsLegalTopicKeyword(text: string): boolean {
+  const lower = ` ${text.toLowerCase()} `
+  return ALL_TOPIC_KEYWORDS.some((kw) => lower.includes(kw))
+}
+
 export function selectReferenceFiles(
   businessType: BusinessType | null,
   latestUserMessage: string,

@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { containsLegalTopicKeyword } from './selectReferences'
 
 // A2 runtime verifier (README-v3-trust-and-delivery.md, Part A, A2 — layer 3
 // in the defense-in-depth diagram in July9-Focus-Backend-Guardrails-
@@ -127,27 +128,38 @@ export async function runVerifiedAnswer(params: {
   return { text: fallbackText, flagged: true, usedFallback: true }
 }
 
-// Skip verification for ordinary conversational filler — exact-anchored
-// (the WHOLE trimmed message must match), never a loose substring match, so
-// a real question that happens to start with "hi" or "thanks" (e.g. "thanks
-// for explaining, but what about a 4-person split?") is never mistaken for
-// small talk and skipped. False negatives here (verifying something trivial)
-// just cost a little extra latency/money; false positives (skipping
-// verification on something substantive) are the actually dangerous
-// direction, so the pattern list stays deliberately narrow.
-const SMALL_TALK_PATTERNS: RegExp[] = [
-  /^(hi|hello|hey|hiya|yo)[!.]*$/i,
-  /^(thanks|thank you|thx|ty)[!.]*$/i,
-  /^(ok|okay|k|kk|cool|got it|sounds good|great|nice|perfect|awesome)[!.]*$/i,
-  /^(yes|yeah|yep|no|nope|sure)[!.]*$/i,
-  /^(bye|goodbye|see ya|later)[!.]*$/i,
-  /^(good morning|good afternoon|good evening|good night)[!.]*$/i,
-]
+// Skip verification for ordinary conversational filler, to control cost —
+// but classified on the ASSISTANT'S DRAFT, never on the user's message.
+//
+// Codex audit (High): an earlier version gated on the latest USER message
+// with an exact-anchored small-talk pattern list. That breaks in a
+// multi-turn legal conversation: "Should we form a Delaware C-Corp for
+// VC?" -> "Do you want details?" -> "yes" has a user message ("yes") that
+// matches a small-talk pattern trivially, but the resulting assistant
+// draft is a full substantive legal explanation — which then skipped
+// verification entirely. The thing being verified is the ANSWER, so the
+// skip decision has to classify the answer, not whatever the user
+// happened to type to prompt it.
+//
+// A draft is treated as small talk only if it is BOTH short AND contains
+// no legal-topic vocabulary (containsLegalTopicKeyword, reused from
+// lib/selectReferences.ts's TOPIC_RULES rather than a second, driftable
+// keyword list). Either signal alone can force verification: a long reply
+// is verified regardless of keywords (FORMAT_RULES caps real answers at
+// 3-5 sentences, so length alone is a reasonable proxy for substance), and
+// a short reply is verified the moment it mentions any topic keyword, so a
+// brief-but-real answer like "Yes, a Delaware C-Corp is standard for VC."
+// is never skipped just for being brief. False positives here (verifying
+// something trivial) just cost a little extra latency/money; false
+// negatives (skipping verification on something substantive) are the
+// actually dangerous direction, so both signals lean toward verifying.
+const SMALL_TALK_DRAFT_MAX_CHARS = 150
 
-export function isSmallTalk(message: string): boolean {
-  const trimmed = message.trim()
+export function isSmallTalkDraft(draft: string): boolean {
+  const trimmed = draft.trim()
   if (!trimmed) return true
-  return SMALL_TALK_PATTERNS.some((p) => p.test(trimmed))
+  if (trimmed.length > SMALL_TALK_DRAFT_MAX_CHARS) return false
+  return !containsLegalTopicKeyword(trimmed)
 }
 
 // ── Aggregate, privacy-safe observability ───────────────────────────────────

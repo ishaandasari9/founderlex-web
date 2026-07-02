@@ -3,7 +3,7 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import { detectOutOfScope } from './outOfScopeGuard'
 import { containsForbiddenAssertion } from './forbiddenAssertions'
-import { runVerifiedAnswer, verifyAnswer, isSmallTalk, logVerifierEvent } from './runtimeVerifier'
+import { runVerifiedAnswer, verifyAnswer, isSmallTalkDraft, logVerifierEvent } from './runtimeVerifier'
 
 let _client: Anthropic | null = null
 function getClient() {
@@ -199,18 +199,22 @@ export async function getChatResponse(
 
   const system = buildSystemPrompt(founderName, buildingDesc, profileContext, referenceContext)
   const rawDraft = await callModel(messages, system)
+  const draft = formatChatText(rawDraft)
 
   const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user')?.content ?? ''
 
   // A2, layer 3: only run the second-model verifier on substantive legal
   // answers, not small talk, to control cost (README-v3 A2 backend note).
-  // Small talk skips straight to layer 4 below — there's no legal claim in
-  // "thanks!" for a verifier to check.
-  if (isSmallTalk(lastUserMessage)) {
-    return finalizeChatResponse(rawDraft)
+  // Gated on the DRAFT, not the user's message (Codex audit, High): a short
+  // user reply like "yes" mid-conversation is not itself evidence the
+  // resulting answer is small talk — the answer is what gets verified, so
+  // the answer is what gets classified. Small talk skips straight to layer
+  // 4 below — there's no legal claim in "You're welcome!" for a verifier
+  // to check.
+  if (isSmallTalkDraft(draft)) {
+    return finalizeChatResponse(draft)
   }
 
-  const draft = formatChatText(rawDraft)
   const result = await runVerifiedAnswer({
     initialDraft: draft,
     verify: (text) => verifyAnswer(lastUserMessage, text, referenceContext ?? ''),

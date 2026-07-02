@@ -9,7 +9,7 @@ import {
   isCleanVerdict,
   resolveVerdict,
   runVerifiedAnswer,
-  isSmallTalk,
+  isSmallTalkDraft,
   logVerifierEvent,
   getVerifierStats,
   resetVerifierStatsForTests,
@@ -180,17 +180,64 @@ async function main() {
     check(result.text === 'FALLBACK: regeneration failed.' && result.usedFallback, 'a thrown error during regeneration also falls back safely, not a crash')
   }
 
-  // ── isSmallTalk ──────────────────────────────────────────────────────────
-  check(isSmallTalk('thanks!') === true, 'isSmallTalk flags "thanks!"')
-  check(isSmallTalk('ok') === true, 'isSmallTalk flags "ok"')
-  check(isSmallTalk('  Hello  ') === true, 'isSmallTalk flags "Hello" ignoring surrounding whitespace/case')
-  check(isSmallTalk('') === true, 'isSmallTalk flags an empty message')
-  check(isSmallTalk('What is an LLC?') === false, 'isSmallTalk does not flag a real question')
+  // ── isSmallTalkDraft: classifies the ASSISTANT DRAFT, not the user
+  // message (Codex audit, High) ────────────────────────────────────────────
+  check(isSmallTalkDraft('') === true, 'isSmallTalkDraft flags an empty draft')
+  check(isSmallTalkDraft("You're welcome!") === true, 'isSmallTalkDraft flags a true, short greeting/acknowledgment draft')
   check(
-    isSmallTalk("Thanks for explaining, but what about a 4-person equal split?") === false,
-    'isSmallTalk does not flag a message that merely starts with a small-talk word but continues with real content',
+    isSmallTalkDraft("Glad I could help, let me know if you have more questions!") === true,
+    'isSmallTalkDraft flags a short, friendly closing line with no legal content',
   )
-  check(isSmallTalk('Do I need a registered agent in Delaware?') === false, 'isSmallTalk does not flag a substantive compliance question')
+  check(
+    isSmallTalkDraft('An LLC creates a legal wall between the business and your personal assets.') === false,
+    'isSmallTalkDraft does not flag a short draft that DOES contain legal-topic vocabulary ("LLC", "personal assets")',
+  )
+  check(
+    isSmallTalkDraft(
+      "Yes, forming a Delaware C-Corp is the standard structure most VCs expect, since it lets you issue stock and stock options cleanly and investors are already familiar with Delaware's corporate law. Setting up the stock structure correctly should go through a startup attorney rather than a DIY filing.",
+    ) === false,
+    'isSmallTalkDraft does not flag a long, substantive draft',
+  )
+
+  // ── REQUIRED (Codex regression): a substantive draft produced from a
+  // multi-turn conversation where the LATEST USER MESSAGE is trivial
+  // ("yes") must still be classified as needing verification. The bug was
+  // gating on the user's message instead of the assistant's draft — this
+  // proves the fix by classifying only the draft, exactly as
+  // lib/chat.ts's getChatResponse now does, and contrasting it with what
+  // the old (removed) user-message-based check would have said. ─────────────
+  {
+    const messages = [
+      { role: 'user' as const, content: 'Should we form a Delaware C-Corp for VC?' },
+      { role: 'assistant' as const, content: 'Do you want details?' },
+      { role: 'user' as const, content: 'yes' },
+    ]
+    const lastUserMessage = messages[messages.length - 1].content
+    const substantiveDraft =
+      "A Delaware C-Corp is what most VCs expect, since it lets you issue preferred stock and stock options cleanly, and it's the entity type nearly all standard VC term sheets assume. It's more complex and costly to set up correctly than an LLC, so the stock structure and any 83(b) election timing should go through a startup attorney."
+
+    // What the OLD, now-removed user-message-based heuristic would have
+    // said (inlined here, not imported, since it no longer exists in the
+    // module — this is purely illustrating the bug that was fixed).
+    const oldStyleUserMessageCheck = /^(yes|yeah|yep|no|nope|sure)[!.]*$/i.test(lastUserMessage.trim())
+    check(oldStyleUserMessageCheck === true, "sanity check: the trivial user reply \"yes\" WOULD have matched the old, buggy user-message heuristic")
+
+    check(
+      isSmallTalkDraft(substantiveDraft) === false,
+      'REQUIRED: a substantive draft is verified regardless of how trivial the user message that prompted it was ("yes")',
+    )
+  }
+
+  // Subgroup variant with a different trivial user message ("ok") and a
+  // different substantive topic, to confirm this isn't a one-off.
+  {
+    const substantiveDraft =
+      'Copyright exists automatically the moment you create the work, but you generally cannot sue for infringement in federal court until it is registered with the U.S. Copyright Office, which costs around forty five to sixty five dollars per work.'
+    check(
+      isSmallTalkDraft(substantiveDraft) === false,
+      'REQUIRED (subgroup): a second substantive draft (copyright registration) is also verified regardless of a trivial prompting message',
+    )
+  }
 
   // ── Aggregate logging: no personal data, counts accumulate correctly ────
   resetVerifierStatsForTests()
