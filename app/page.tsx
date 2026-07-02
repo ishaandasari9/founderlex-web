@@ -23,6 +23,7 @@ import RoadmapPanel from '@/components/RoadmapPanel'
 import RedFlagCard from '@/components/RedFlagCard'
 import { detectRedFlags, checkAssistantOverstep, type RedFlag } from '@/lib/redFlags'
 import BeforeYouSignChecklist from '@/components/BeforeYouSignChecklist'
+import CitationChip, { type CitationLink } from '@/components/CitationChip'
 
 // ── React Bits — SSR disabled (motion/react needs window) ────────────────────
 // Cast to any to bypass TypeScript inference quirks from .jsx component files
@@ -69,6 +70,7 @@ interface Msg {
   filled?: string
   flags?: RedFlag[]
   isLoading?: boolean
+  citations?: CitationLink[]
 }
 
 // ── Brand tokens ─────────────────────────────────────────────────────────────
@@ -479,9 +481,14 @@ export default function Home() {
       const reply: string = data.content || "I'm sorry, I couldn't process that. Could you rephrase?"
       const updatedProfile: FounderProfile | null = data.profile ?? profileRef.current
       if (data.profile) setProfile(data.profile)
+      // A3 inline citations — /api/chat only ever includes these for a
+      // genuine grounded answer (never a guard refusal or safety fallback),
+      // so no extra check is needed here beyond trusting an empty/missing
+      // array means no citation, not an error.
+      const citations: CitationLink[] | undefined = Array.isArray(data.citations) && data.citations.length > 0 ? data.citations : undefined
 
       const next = messagesRef.current.filter(m => !m.isLoading)
-      const botMsg: Msg = { role: 'bot', text: reply }
+      const botMsg: Msg = { role: 'bot', text: reply, citations }
       const result: Msg[] = [...next, botMsg]
       const tpl = detectTemplate(reply)
       if (tpl) result.push({ role: 'doc-card', text: '', template: tpl })
@@ -1007,6 +1014,7 @@ export default function Home() {
                     }}>
                       {m.text}
                     </div>
+                    {m.role === 'bot' && <CitationChip citations={m.citations} />}
                     {m.role === 'bot' && <ReadAloudButton text={m.text} />}
                   </div>
                 </div>
