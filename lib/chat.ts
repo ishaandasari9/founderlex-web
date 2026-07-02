@@ -35,6 +35,35 @@ REPLY STYLE - follow these exactly, they override everything else:
 
 export type ChatMessage = { role: 'user' | 'assistant'; content: string }
 
+// Unlike /api/explain (which has an explicit 20k-char cap for a one-time
+// document paste), chat previously had no size limit at all — a single
+// oversized message, sent directly to the API without going through the UI,
+// costs real money and also gets run through extractProfile's own separate
+// LLM call before getChatResponse is ever reached.
+const MAX_MESSAGE_CHARS = 4000
+const MAX_TOTAL_CHARS = 40000
+
+export function validateChatInput(messages: ChatMessage[]): string | null {
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return 'No message provided.'
+  }
+
+  let total = 0
+  for (const m of messages) {
+    const len = (m?.content ?? '').length
+    if (len > MAX_MESSAGE_CHARS) {
+      return `That message is too long (${len.toLocaleString()} characters, limit ${MAX_MESSAGE_CHARS.toLocaleString()}). Try breaking it into shorter messages.`
+    }
+    total += len
+  }
+
+  if (total > MAX_TOTAL_CHARS) {
+    return `This conversation has gotten too long for one request (${total.toLocaleString()} characters, limit ${MAX_TOTAL_CHARS.toLocaleString()}). Try starting a new conversation.`
+  }
+
+  return null
+}
+
 export async function getChatResponse(
   messages: ChatMessage[],
   founderName?: string,

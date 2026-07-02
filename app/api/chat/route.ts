@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { getChatResponse } from '@/lib/chat'
+import { getChatResponse, validateChatInput } from '@/lib/chat'
 import { extractProfile } from '@/lib/extractProfile'
 import { validateProfile, describeProfile, type FounderProfile } from '@/lib/founderProfile'
 import { selectReferenceFiles } from '@/lib/selectReferences'
@@ -42,6 +42,11 @@ export async function POST(req: Request) {
       founderName?: string
       buildingDesc?: string
       profile?: FounderProfile | null
+    }
+
+    const validationError = validateChatInput(messages)
+    if (validationError) {
+      return NextResponse.json({ error: validationError }, { status: 400 })
     }
 
     const updatedProfile = await extractProfile(messages, profile ?? null)
