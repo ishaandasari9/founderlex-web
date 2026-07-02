@@ -26,7 +26,8 @@
     "test:forbidden-assertions": "npx tsx tests/forbiddenAssertions.test.ts",
     "test:name-web-search": "npx tsx tests/nameWebSearch.test.ts",
     "test:untrusted-content": "npx tsx tests/untrustedContent.test.ts",
-    "test:text-formatting": "npx tsx tests/textFormatting.test.ts"
+    "test:text-formatting": "npx tsx tests/textFormatting.test.ts",
+    "test:deadlines": "npx tsx tests/deadlineReminders.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",
