@@ -55,3 +55,26 @@ export function detectTemplate(text: string): string | null {
   }
   return null
 }
+
+// B2 Founder Pack: resolve FounderProfile.recommended_documents (free
+// text, whatever phrasing the extraction model used) down to template_name
+// keys via detectTemplate above. Deliberately kept in this dependency-free
+// module (only a type import from founderProfile) rather than in
+// lib/founderPack.ts — that module pulls in lib/generateDocument.ts, which
+// imports 'fs' and Node-only packages (pdfkit, html-to-docx), and this
+// function needs to run CLIENT-SIDE too (app/page.tsx uses it to build the
+// Founder Pack confirm panel before ever calling the API). Deduped; an
+// entry that doesn't resolve to a known template is silently dropped
+// rather than failing the whole pack.
+export function resolveRecommendedTemplates(profile: { recommended_documents: string[] }): string[] {
+  const resolved: string[] = []
+  const seen = new Set<string>()
+  for (const entry of profile.recommended_documents) {
+    const key = detectTemplate(entry)
+    if (key && !seen.has(key)) {
+      seen.add(key)
+      resolved.push(key)
+    }
+  }
+  return resolved
+}

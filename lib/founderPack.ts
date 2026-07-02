@@ -1,5 +1,5 @@
 import { validateProfile, type FounderProfile } from './founderProfile'
-import { detectTemplate, TEMPLATE_LABELS } from './templateMeta'
+import { TEMPLATE_LABELS, resolveRecommendedTemplates } from './templateMeta'
 import { generateDocument, type GeneratedDocumentResult } from './generateDocument'
 import { extractBlanks } from './lawyerReviewEmail'
 
@@ -9,26 +9,13 @@ import { extractBlanks } from './lawyerReviewEmail'
 // generateFounderPack below calls the exact same generateDocument()
 // app/api/generate/route.ts uses, once per recommended template.
 
-// Resolve FounderProfile.recommended_documents (free text, whatever
-// phrasing the extraction model used, e.g. "Founders' Agreement") down to
-// template_name keys, using the SAME keyword matcher app/page.tsx already
-// uses for doc-card detection in chat (lib/templateMeta.ts's
-// detectTemplate) — not a second, driftable matcher. Deduped; an entry
-// that doesn't resolve to a known template is silently dropped rather than
-// failing the whole pack (a recommendation FounderLex can't map to an
-// actual template shouldn't block the rest of it).
-export function resolveRecommendedTemplates(profile: FounderProfile): string[] {
-  const resolved: string[] = []
-  const seen = new Set<string>()
-  for (const entry of profile.recommended_documents) {
-    const key = detectTemplate(entry)
-    if (key && !seen.has(key)) {
-      seen.add(key)
-      resolved.push(key)
-    }
-  }
-  return resolved
-}
+// Re-exported so existing imports of resolveRecommendedTemplates from this
+// module keep working — the definition itself lives in
+// lib/templateMeta.ts, a dependency-free module, since app/page.tsx needs
+// to call it CLIENT-SIDE (before ever hitting the API) and this module
+// pulls in lib/generateDocument.ts's Node-only imports (fs, pdfkit,
+// html-to-docx), which can't be bundled for the browser.
+export { resolveRecommendedTemplates }
 
 // One-line, plain-English "what this document is for" — distinct from
 // lib/lawyerReviewEmail.ts's CONCERN_HINTS ("what a lawyer should check"),

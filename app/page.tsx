@@ -10,6 +10,7 @@ import { validateProfile, emptyProfile, type FounderProfile } from '@/lib/founde
 import type { ConfirmField } from '@/lib/confirmationFields'
 import { buildLawyerReviewEmail, type GeneratedDoc } from '@/lib/lawyerReviewEmail'
 import ConfirmDocPanel, { type ConfirmPanelState } from '@/components/ConfirmDocPanel'
+import ConfirmPackPanel, { type ConfirmPackPanelState } from '@/components/ConfirmPackPanel'
 import ConsentGate from '@/components/ConsentGate'
 import LawyerReviewEmailPanel from '@/components/LawyerReviewEmailPanel'
 import NameSearchPanel from '@/components/NameSearchPanel'
@@ -24,7 +25,7 @@ import RedFlagCard from '@/components/RedFlagCard'
 import { detectRedFlags, checkAssistantOverstep, type RedFlag } from '@/lib/redFlags'
 import BeforeYouSignChecklist from '@/components/BeforeYouSignChecklist'
 import CitationChip, { type CitationLink } from '@/components/CitationChip'
-import { TEMPLATE_LABELS, detectTemplate } from '@/lib/templateMeta'
+import { TEMPLATE_LABELS, detectTemplate, resolveRecommendedTemplates } from '@/lib/templateMeta'
 
 // ── React Bits — SSR disabled (motion/react needs window) ────────────────────
 // Cast to any to bypass TypeScript inference quirks from .jsx component files
@@ -95,6 +96,16 @@ const MONO       = 'var(--font-mono), monospace'
 // doc-card detection, not a second copy.
 
 // ── Download helper ───────────────────────────────────────────────────────────
+function downloadBase64(b64: string, name: string, mime: string) {
+  const bytes = atob(b64)
+  const arr = new Uint8Array(bytes.length)
+  for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i)
+  const url = URL.createObjectURL(new Blob([arr], { type: mime }))
+  const a = document.createElement('a')
+  a.href = url; a.download = name; a.click()
+  URL.revokeObjectURL(url)
+}
+
 async function generateAndDownload(
   templateName: string,
   profile: FounderProfile | null
@@ -108,18 +119,32 @@ async function generateAndDownload(
     const data = await res.json()
     if (data.error) return { ok: false, error: data.error }
 
-    const dl = (b64: string, name: string, mime: string) => {
-      const bytes = atob(b64)
-      const arr = new Uint8Array(bytes.length)
-      for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i)
-      const url = URL.createObjectURL(new Blob([arr], { type: mime }))
-      const a = document.createElement('a')
-      a.href = url; a.download = name; a.click()
-      URL.revokeObjectURL(url)
-    }
-    if (data.pdf_b64)  dl(data.pdf_b64,  data.pdf_name  || 'document.pdf',  'application/pdf')
-    if (data.docx_b64) dl(data.docx_b64, data.docx_name || 'document.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    if (data.pdf_b64)  downloadBase64(data.pdf_b64,  data.pdf_name  || 'document.pdf',  'application/pdf')
+    if (data.docx_b64) downloadBase64(data.docx_b64, data.docx_name || 'document.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
     return { ok: true, filled: data.filled }
+  } catch (e: unknown) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+// B2 Founder Pack: same fetch-and-download shape as generateAndDownload
+// above, but hits /api/founder-pack and downloads one zip instead of a
+// docx/pdf pair. Returns the cover memo + doc list on success so the caller
+// can surface them in the chat.
+async function generateFounderPackAndDownload(
+  profile: FounderProfile | null
+): Promise<{ ok: boolean; error?: string; coverMemo?: string; docs?: { template_name: string; label: string }[] }> {
+  try {
+    const res = await fetch('/api/founder-pack', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profile }),
+    })
+    const data = await res.json()
+    if (data.error) return { ok: false, error: data.error }
+
+    if (data.zip_b64) downloadBase64(data.zip_b64, data.zip_name || 'founder-pack.zip', 'application/zip')
+    return { ok: true, coverMemo: data.cover_memo, docs: data.docs }
   } catch (e: unknown) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
   }
@@ -310,7 +335,18 @@ function DocCard({
 
 // ── Confirmation gate (Human-in-the-loop Gate 2) ─────────────────────────────
 
-function buildEffectiveProfile(base: FounderProfile | null, panel: ConfirmPanelState): FounderProfile {
+// Structural subset both ConfirmPanelState (single-document) and
+// ConfirmPackPanelState (B2 Founder Pack) satisfy, so this one function
+// builds the effective profile for either confirm gate — no second copy.
+interface ProfileEditableFields {
+  companyName: string
+  state: string
+  structure: string
+  description: string
+  founders: { name: string; equity_pct: number }[]
+}
+
+function buildEffectiveProfile(base: FounderProfile | null, panel: ProfileEditableFields): FounderProfile {
   const b = base ?? emptyProfile()
   return {
     ...b,
@@ -359,6 +395,9 @@ export default function Home() {
   const [generatingTpl, setGeneratingTpl] = useState<string | null>(null)
   const [confirmPanel, setConfirmPanel]   = useState<ConfirmPanelState | null>(null)
   const [confirmGenerating, setConfirmGenerating] = useState(false)
+  const [packConfirm, setPackConfirm]     = useState<ConfirmPackPanelState | null>(null)
+  const [packGenerating, setPackGenerating] = useState(false)
+  const [packLoadingFields, setPackLoadingFields] = useState(false)
   const [lawyerEmail, setLawyerEmail]     = useState<string | null>(null)
   const [showNameSearch, setShowNameSearch] = useState(false)
   const [showExplainForm, setShowExplainForm] = useState(false)
@@ -525,6 +564,68 @@ export default function Home() {
       alert(`Could not generate document: ${result.error ?? 'Unknown error'}`)
     }
   }, [confirmPanel, persistSession])
+
+  // ── B2 Founder Pack: same confirm-then-generate gate as a single document
+  // (README-v3 B2: "Keep the confirm-contents gate — a batch action
+  // shouldn't skip confirmation"), but for every recommended document at
+  // once. resolveRecommendedTemplates runs client-side (dependency-free,
+  // safe for the browser bundle); the per-template field union still needs
+  // a server round trip since reading a template's raw markdown requires
+  // fs, so this reuses the EXISTING GET /api/generate?template_name=X
+  // endpoint once per resolved template, rather than adding a new one. ────
+  const handleOpenFounderPack = useCallback(async () => {
+    const p = profileRef.current
+    const templateNames = resolveRecommendedTemplates(p ?? emptyProfile())
+    if (templateNames.length === 0) {
+      alert('No recommended documents yet — chat with FounderLex first so it can recommend what you need.')
+      return
+    }
+    setPackLoadingFields(true)
+    try {
+      const results = await Promise.all(
+        templateNames.map(t => fetch(`/api/generate?template_name=${encodeURIComponent(t)}`).then(r => r.json())),
+      )
+      const fieldsByKey = new Map<string, ConfirmField>()
+      for (const r of results) {
+        if (r.error) continue
+        for (const f of (r.fields ?? []) as ConfirmField[]) fieldsByKey.set(f.key, f)
+      }
+      setPackConfirm({
+        templateNames,
+        fields: Array.from(fieldsByKey.values()),
+        companyName: p?.company_name || '',
+        state: p?.state || '',
+        structure: p?.structure || '',
+        description: p?.product_description || '',
+        founders: (p?.founders || []).map(f => ({ name: f.name, equity_pct: f.equity_pct })),
+      })
+    } catch (e: unknown) {
+      alert(`Could not load Founder Pack fields: ${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      setPackLoadingFields(false)
+    }
+  }, [])
+
+  const handleCancelFounderPack = useCallback(() => setPackConfirm(null), [])
+
+  const handleConfirmFounderPack = useCallback(async () => {
+    if (!packConfirm) return
+    setPackGenerating(true)
+    const effectiveProfile = buildEffectiveProfile(profileRef.current, packConfirm)
+    const result = await generateFounderPackAndDownload(effectiveProfile)
+    setPackGenerating(false)
+    if (result.ok) {
+      setDocCount(prev => prev + (result.docs?.length ?? packConfirm.templateNames.length))
+      setMessages(prev => {
+        const next: Msg[] = [...prev, { role: 'bot', text: result.coverMemo ?? 'Your Founder Pack is ready and downloading now.' }]
+        persistSession(next, profileRef.current)
+        return next
+      })
+      setPackConfirm(null)
+    } else {
+      alert(`Could not generate your Founder Pack: ${result.error ?? 'Unknown error'}`)
+    }
+  }, [packConfirm, persistSession])
 
   const handleOpenLawyerEmail = useCallback(() => {
     setLawyerEmail(buildLawyerReviewEmail(profileRef.current ?? emptyProfile(), generatedDocs))
@@ -886,6 +987,16 @@ export default function Home() {
                 }}>
                 Check a name
               </button>
+              <button onClick={handleOpenFounderPack}
+                disabled={packLoadingFields}
+                className="chat-clear-btn"
+                style={{
+                  fontFamily: MONO, fontSize: 10, letterSpacing: '0.10em', textTransform: 'uppercase',
+                  color: RED, background: 'none', border: 'none', cursor: packLoadingFields ? 'default' : 'pointer', padding: 0,
+                  opacity: packLoadingFields ? 0.5 : 1,
+                }}>
+                {packLoadingFields ? 'Loading…' : 'Founder pack'}
+              </button>
               {generatedDocs.length > 0 && (
                 <button onClick={handleOpenLawyerEmail}
                   className="chat-clear-btn"
@@ -1024,6 +1135,17 @@ export default function Home() {
           onChange={setConfirmPanel}
           onCancel={handleCancelConfirm}
           onConfirm={handleConfirmGenerate}
+        />
+      )}
+
+      {packConfirm && (
+        <ConfirmPackPanel
+          panel={packConfirm}
+          validation={validateProfile(buildEffectiveProfile(profile, packConfirm))}
+          generating={packGenerating}
+          onChange={setPackConfirm}
+          onCancel={handleCancelFounderPack}
+          onConfirm={handleConfirmFounderPack}
         />
       )}
 
