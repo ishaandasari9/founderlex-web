@@ -4,12 +4,19 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { ShieldCheck, ExternalLink } from 'lucide-react'
 import { buildNameSearch, NAME_SEARCH_DISCLAIMER } from '@/lib/nameSearch'
 import type { FounderProfile } from '@/lib/founderProfile'
+import ReadAloudButton from '@/components/ReadAloudButton'
 
 const RED   = '#DB1A1A'
 const INK   = '#2A2420'
 const MUTED = '#6F655B'
+const FAINT = '#9B8F82'
 
 type PanelPhase = 'entering' | 'visible' | 'exiting'
+
+interface WebSource {
+  url: string
+  title: string
+}
 
 export default function NameSearchPanel({
   profile, onClose,
@@ -21,6 +28,11 @@ export default function NameSearchPanel({
   const [name, setName] = useState(profile?.company_name || '')
   const [submitted, setSubmitted] = useState(name.trim().length > 0)
 
+  const [webLoading, setWebLoading] = useState(false)
+  const [webSummary, setWebSummary] = useState<string | null>(null)
+  const [webSources, setWebSources] = useState<WebSource[]>([])
+  const [webError, setWebError] = useState<string | null>(null)
+
   useEffect(() => {
     const id = requestAnimationFrame(() => setPhase('visible'))
     return () => cancelAnimationFrame(id)
@@ -29,6 +41,38 @@ export default function NameSearchPanel({
   const handleClose = () => {
     setPhase('exiting')
     window.setTimeout(onClose, 200)
+  }
+
+  const runWebSearch = async (query: string) => {
+    setWebLoading(true)
+    setWebError(null)
+    setWebSummary(null)
+    setWebSources([])
+    try {
+      const res = await fetch('/api/name-search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: query }),
+      })
+      const data = await res.json()
+      if (data.error) {
+        setWebError(data.error)
+      } else {
+        setWebSummary(data.summary)
+        setWebSources(data.sources ?? [])
+      }
+    } catch (e: unknown) {
+      setWebError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setWebLoading(false)
+    }
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    const trimmed = name.trim()
+    setSubmitted(trimmed.length > 0)
+    if (trimmed) runWebSearch(trimmed)
   }
 
   const result = useMemo(() => {
@@ -49,15 +93,12 @@ export default function NameSearchPanel({
           <span className="confirm-panel-eyebrow">Research a name</span>
           <h2 id="name-search-panel-title" className="confirm-panel-title">Similar Name Search</h2>
           <p className="confirm-panel-subtitle">
-            Check public databases for names similar to one you&apos;re considering.
+            Live web search for names similar to one you&apos;re considering, plus official databases to check yourself.
           </p>
         </header>
 
         <div className="confirm-panel-scroll">
-          <form
-            onSubmit={e => { e.preventDefault(); setSubmitted(name.trim().length > 0) }}
-            style={{ display: 'flex', gap: 8, marginBottom: 16 }}
-          >
+          <form onSubmit={handleSubmit} style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
             <input
               className="confirm-panel-input"
               value={name}
@@ -65,21 +106,69 @@ export default function NameSearchPanel({
               placeholder="The name you're considering"
               aria-label="Business, nonprofit, or brand name to search"
               autoFocus
+              disabled={webLoading}
             />
             <button
               type="submit"
               className="confirm-panel-btn confirm-panel-btn--primary"
-              disabled={!name.trim()}
+              disabled={!name.trim() || webLoading}
               style={{ flexShrink: 0 }}
             >
-              Search
+              {webLoading ? 'Searching…' : 'Search'}
             </button>
           </form>
+
+          {webError && (
+            <div className="confirm-panel-notice" role="status" style={{ marginBottom: 16 }}>
+              <span className="confirm-panel-notice-title">Could not complete the web search</span>
+              <span className="confirm-panel-notice-text">{webError}</span>
+            </div>
+          )}
+
+          {webSummary && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 18 }}>
+              <span className="confirm-panel-label">Live web search results</span>
+              <ReadAloudButton text={webSummary} label="Read results aloud" />
+              <div style={{
+                whiteSpace: 'pre-wrap',
+                fontFamily: 'var(--font-newsreader), Georgia, serif',
+                fontSize: 14,
+                lineHeight: 1.6,
+                color: INK,
+                background: '#FFFFFF',
+                border: '1px solid rgba(42,36,32,0.12)',
+                borderRadius: 10,
+                padding: '12px 14px',
+              }}>
+                {webSummary}
+              </div>
+
+              {webSources.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: FAINT }}>
+                    Sources
+                  </span>
+                  {webSources.map(source => (
+                    <a
+                      key={source.url}
+                      href={source.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'var(--font-newsreader), Georgia, serif', fontSize: 13, color: RED, textDecoration: 'none' }}
+                    >
+                      <ExternalLink size={11} strokeWidth={2} aria-hidden />
+                      {source.title}
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {result && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <span className="confirm-panel-label">Places to check</span>
+                <span className="confirm-panel-label">Official databases to check yourself</span>
                 {result.links.map(link => (
                   <a
                     key={link.id}

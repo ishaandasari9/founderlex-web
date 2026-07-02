@@ -23,7 +23,10 @@
     "test:chat-input": "npx tsx tests/chatInputValidation.test.ts",
     "test:session-validation": "npx tsx tests/sessionValidation.test.ts",
     "test:request-guard": "npx tsx tests/requestGuard.test.ts",
-    "test:forbidden-assertions": "npx tsx tests/forbiddenAssertions.test.ts"
+    "test:forbidden-assertions": "npx tsx tests/forbiddenAssertions.test.ts",
+    "test:name-web-search": "npx tsx tests/nameWebSearch.test.ts",
+    "test:untrusted-content": "npx tsx tests/untrustedContent.test.ts",
+    "test:text-formatting": "npx tsx tests/textFormatting.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",

@@ -2,6 +2,8 @@ import Anthropic from '@anthropic-ai/sdk'
 import { getSystemPrompt } from './chat'
 import { detectOutOfScope } from './outOfScopeGuard'
 import { containsForbiddenAssertion } from './forbiddenAssertions'
+import { wrapUntrustedContent } from './untrustedContent'
+import { stripMarkdownFormatting } from './textFormatting'
 
 export { containsForbiddenAssertion } from './forbiddenAssertions'
 
@@ -41,12 +43,8 @@ Hard boundary, never break this: you explain and flag, you never advise whether 
 
 End your reply with exactly this sentence, verbatim, and nothing after it: "${EXPLAIN_CLOSING_LINE}"`
 
-// Defensive: neutralize any literal occurrence of our own delimiter tags
-// inside the pasted text, so untrusted content can't fake an early close and
-// inject text that the model would treat as outside the delimited block.
 export function wrapUntrustedDocument(text: string): string {
-  const neutralized = text.replace(new RegExp(`</?${DOCUMENT_TAG}>`, 'gi'), '[removed matching tag]')
-  return `<${DOCUMENT_TAG}>\n${neutralized}\n</${DOCUMENT_TAG}>`
+  return wrapUntrustedContent(text, DOCUMENT_TAG)
 }
 
 const SAFE_FALLBACK =
@@ -59,19 +57,6 @@ function stripAttemptedClosingLine(text: string): string {
   return (looksLikeClosingAttempt ? lines.slice(0, -1) : lines).join('\n').trim()
 }
 
-// The model doesn't reliably honor "no markdown" over a longer structured
-// reply, so strip it in code the same way lib/chat.ts does for short replies.
-// Line breaks are preserved (unlike lib/speech.ts's stripper) since this text
-// is read on screen, not spoken.
-function stripMarkdownFormatting(text: string): string {
-  return text
-    .replace(/\*\*(.+?)\*\*/g, '$1')
-    .replace(/\*(.+?)\*/g, '$1')
-    .replace(/^#{1,6}\s+/gm, '')
-    .replace(/\s*—\s*/g, ', ')
-    .replace(/\s*–\s*/g, ', ')
-}
-
 // Enforces the mandated closing line in code, since an LLM cannot be trusted
 // to reproduce a sentence verbatim on every call.
 //
@@ -81,10 +66,19 @@ function stripMarkdownFormatting(text: string): string {
 // actually see are exactly the same string, rather than relying solely on
 // the shared normalizer to stay in sync with whatever formatting the model
 // happens to produce.
+//
+// The model's own attempted closing line is stripped BEFORE the
+// forbidden-assertion check, not after: a live bug found in the sibling
+// name-search feature (lib/nameWebSearch.ts) showed that checking before
+// stripping lets the mandated line's own required wording collide with a
+// forbidden-assertion pattern and produce a false-positive fallback. This
+// closing line doesn't currently collide with any pattern, but the ordering
+// is fixed here too so the same bug class can't resurface if patterns are
+// extended later.
 export function finalizeExplanation(raw: string): string {
   const stripped = stripMarkdownFormatting(raw)
-  if (containsForbiddenAssertion(stripped)) return SAFE_FALLBACK
   const body = stripAttemptedClosingLine(stripped)
+  if (containsForbiddenAssertion(body)) return SAFE_FALLBACK
   return `${body}\n\n${EXPLAIN_CLOSING_LINE}`
 }
 

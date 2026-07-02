@@ -26,6 +26,21 @@ const FORBIDDEN_ASSERTION_PATTERNS: RegExp[] = [
   /\bskip\s+(the\s+)?(attorney|lawyer)\b/i,
   /you'?re\s+(good|all set|clear)\s+to\s+sign/i,
   /nothing\s+(here\s+)?(should\s+)?stop(s|ping)?\s+you\s+from\s+signing/i,
+  // Name/trademark-verdict phrasing (Name & Similar Org Search feature) —
+  // the same idea as the sign/document patterns above, but for "use" or
+  // "register a name" rather than "sign a document." Scoped tightly around
+  // "name" or "trademark"/"register"/"use" specifically, since bare words
+  // like "clear," "available," or "conflict" are extremely common in
+  // unrelated, legitimate FounderLex content (e.g. "no conflicts of
+  // interest" in a nonprofit bylaws discussion) and must not be flagged.
+  /\b(this\s+)?name\s+(is|looks|seems|appears)\s+(available|clear|safe|approved)\b/i,
+  /\b(is|looks|seems|appears)\s+(available|clear|safe)\s+to\s+(use|register)\b/i,
+  /\bno\s+(trademark|naming|brand)\s+conflicts?\b/i,
+  /\bno\s+conflicts?\s+(with|for)\s+(this|the)?\s*name\b/i,
+  /\bfree\s+and\s+clear\b/i,
+  /\bfree\s+to\s+(use|register)\s+(this|the)\s+name\b/i,
+  /\byou\s+(can|could)\s+(safely\s+)?(use|register)\s+this\s+name\b/i,
+  /\bapproved\s+(for|to)\s+(use|register(ation)?)\b/i,
 ]
 
 // A phrase split by markdown emphasis ("you can **safely** sign") or by
