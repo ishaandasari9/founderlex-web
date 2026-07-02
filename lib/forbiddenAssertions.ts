@@ -1,3 +1,5 @@
+import removeConfusables from 'confusables'
+
 // Shared regex-based backstop: catches confident verdicts on legal safety
 // that no FounderLex surface should ever make, in either a chat reply or a
 // document explanation. Not a substitute for good prompting — a second,
@@ -66,36 +68,19 @@ const FORBIDDEN_ASSERTION_PATTERNS: RegExp[] = [
 // testing, so word adjacency for detection purposes matches what a reader
 // actually sees, regardless of what formatting or punctuation sits between
 // the words.
-const CONFUSABLES: Record<string, string> = {
-  '\u0430': 'a',
-  '\u0410': 'A',
-  '\u0435': 'e',
-  '\u0415': 'E',
-  '\u03BF': 'o',
-  '\u039F': 'O',
-  '\u043E': 'o',
-  '\u041E': 'O',
-  '\u0441': 'c',
-  '\u0421': 'C',
-  '\u0456': 'i',
-  '\u0406': 'I',
-  '\u04CF': 'l',
-  '\u04C0': 'I',
-  '\u0443': 'y',
-  '\u0423': 'Y',
-  '\u0455': 's',
-  '\u0405': 'S',
-}
-
-function foldConfusables(text: string): string {
-  return text.replace(
-    /[\u039F\u03BF\u0405\u0406\u0410\u0415\u041E\u0421\u0423\u0430\u0435\u043E\u0441\u0443\u0455\u0456\u04C0\u04CF]/g,
-    (ch) => CONFUSABLES[ch] ?? ch,
-  )
-}
-
+//
+// Confusables/homoglyphs (Cyrillic "р" in "you're рrotected," etc.) used to
+// be folded by a hand-maintained CONFUSABLES map covering a handful of
+// Cyrillic/Greek characters (Codex audit finding: it was missing Cyrillic
+// "р" -> "p," among others, and a hand-picked list can never be complete).
+// Replaced with the `confusables` package's remove(), which implements
+// proper Unicode confusables/skeleton normalization across the full Latin
+// alphabet (Cyrillic, Greek, full-width, mathematical alphanumeric, and
+// more) instead of a per-character list that has to be hand-extended every
+// time a new bypass character is found — closing this whole class of
+// bypass permanently rather than one phrase/character at a time.
 function normalizeForDetection(text: string): string {
-  return foldConfusables(text)
+  return removeConfusables(text)
     .normalize('NFKC')
     .replace(/[\u200B-\u200D\uFEFF]/g, '')
     .replace(/[*_`#]+/g, '')

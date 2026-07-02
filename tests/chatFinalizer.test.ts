@@ -69,6 +69,32 @@ check(
   'does NOT flag "you\'re not protected" (negation breaks the adjacency, correctly accurate advice)',
 )
 
+// REQUIRED (Codex re-review, High #1): the hand-maintained CONFUSABLES map
+// missed Cyrillic "р" (U+0440), which visually reads as Latin "p" but
+// wasn't in the fold table, letting "you're рrotected" evade detection
+// entirely. Now handled by the `confusables` package's proper Unicode
+// skeleton normalization instead of a hand-picked character list.
+check(
+  finalizeChatResponse("Lock it in writing, and you're рrotected.").includes(FALLBACK_MARKER),
+  'REQUIRED (Codex): flags the exact reported bypass — Cyrillic "р" (U+0440) in "you\'re рrotected"',
+)
+check(
+  finalizeChatResponse("Lock it in writing, and you're p​rotected.").includes(FALLBACK_MARKER),
+  'REQUIRED (Codex): flags a zero-width character inside "protected"',
+)
+check(
+  finalizeChatResponse('Do that and you are ｃｏｖｅｒｅｄ.').includes(FALLBACK_MARKER),
+  'REQUIRED (Codex): flags a full-width Unicode variant of "covered"',
+)
+check(
+  finalizeChatResponse('Sign it and you’re ｐｒｏｔｅｃｔｅｄ.').includes(FALLBACK_MARKER),
+  'REQUIRED (Codex): flags a full-width Unicode variant of "protected"',
+)
+check(
+  finalizeChatResponse("As long as you have an NDA, you're cоvered.").includes(FALLBACK_MARKER),
+  'flags Cyrillic "о" (looks like Latin "o") in "covered"',
+)
+
 // Existing shared patterns, proven to run through this NEW entry point too
 // (proves reuse, not just presence of the shared module).
 check(
