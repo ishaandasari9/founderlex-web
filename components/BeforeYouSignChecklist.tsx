@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 import { ShieldCheck } from 'lucide-react'
 import { buildChecklist } from '@/lib/beforeYouSignChecklist'
+import ReadAloudButton from '@/components/ReadAloudButton'
 
 const RED   = '#DB1A1A'
 const INK   = '#2A2420'
@@ -36,6 +37,7 @@ export default function BeforeYouSignChecklist({
         <span style={{ fontFamily: 'var(--font-bricolage), sans-serif', fontWeight: 600, fontSize: 15, color: INK }}>
           {label} checklist
         </span>
+        <ReadAloudButton text={items.map(item => item.text).join('. ')} label="Read checklist aloud" />
       </div>
 
       <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>

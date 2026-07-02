@@ -13,6 +13,7 @@ import ConfirmDocPanel, { type ConfirmPanelState } from '@/components/ConfirmDoc
 import ConsentGate from '@/components/ConsentGate'
 import LawyerReviewEmailPanel from '@/components/LawyerReviewEmailPanel'
 import NameSearchPanel from '@/components/NameSearchPanel'
+import ReadAloudButton from '@/components/ReadAloudButton'
 import BeforeYouSignChecklist from '@/components/BeforeYouSignChecklist'
 
 // ── React Bits — SSR disabled (motion/react needs window) ────────────────────
@@ -927,16 +928,18 @@ export default function Home() {
               return (
                 <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
                   {m.role === 'bot' && <div style={{ marginRight: 11, flexShrink: 0, paddingTop: 4 }}><DoorGlyph w={20} h={22} panelTop={7} outerR={10} innerR={4} /></div>}
-                  <div style={{
-                    maxWidth: '82%',
-                    background: m.role === 'user' ? INK : TILE,
-                    color: m.role === 'user' ? CREAM : INK,
-                    padding: '14px 17px',
-                    borderRadius: m.role === 'user' ? '16px 16px 4px 16px' : '4px 16px 16px 16px',
-                    fontFamily: NEWSREADER, fontSize: 16.5, lineHeight: 1.55,
-                    whiteSpace: 'pre-wrap',
-                  }}>
-                    {m.text}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxWidth: '82%', alignItems: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                    <div style={{
+                      background: m.role === 'user' ? INK : TILE,
+                      color: m.role === 'user' ? CREAM : INK,
+                      padding: '14px 17px',
+                      borderRadius: m.role === 'user' ? '16px 16px 4px 16px' : '4px 16px 16px 16px',
+                      fontFamily: NEWSREADER, fontSize: 16.5, lineHeight: 1.55,
+                      whiteSpace: 'pre-wrap',
+                    }}>
+                      {m.text}
+                    </div>
+                    {m.role === 'bot' && <ReadAloudButton text={m.text} />}
                   </div>
                 </div>
               )

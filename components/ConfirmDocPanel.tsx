@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { ShieldCheck } from 'lucide-react'
 import type { ConfirmField } from '@/lib/confirmationFields'
+import ReadAloudButton from '@/components/ReadAloudButton'
 
 const MUTED = '#6F655B'
 
@@ -165,6 +166,7 @@ export default function ConfirmDocPanel({
             {validation.errors.map((err, i) => (
               <span key={i} className="confirm-panel-notice-text">{err}</span>
             ))}
+            <ReadAloudButton text={validation.errors.join('. ')} label="Read warning aloud" />
           </div>
         )}
 

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { ShieldCheck, Copy, Check } from 'lucide-react'
+import ReadAloudButton from '@/components/ReadAloudButton'
 
 const MUTED = '#6F655B'
 
@@ -52,6 +53,7 @@ export default function LawyerReviewEmailPanel({
           <p className="confirm-panel-subtitle">
             Edit this however you like, then copy it into an email to your attorney.
           </p>
+          <ReadAloudButton text={email} label="Read email aloud" />
         </header>
 
         <div className="confirm-panel-scroll">
