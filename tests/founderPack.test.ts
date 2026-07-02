@@ -6,6 +6,7 @@ import { resolveRecommendedTemplates, buildCoverMemo, generateFounderPack, type 
 import { emptyProfile, validateProfile, type FounderProfile } from '../lib/founderProfile'
 import { TEMPLATE_FILES } from '../lib/generateDocument'
 import { TEMPLATE_LABELS } from '../lib/templateMeta'
+import { buildLawyerReviewEmail, extractBlanks, type GeneratedDoc } from '../lib/lawyerReviewEmail'
 
 let checks = 0
 let failures = 0
@@ -174,6 +175,39 @@ async function main() {
       'REQUIRED: the "no blanks" message appears when no document in the pack actually has any blanks',
     )
     check(!memo.includes('Blanks still need filling in'), 'the "blanks remaining" section does NOT appear when there are none')
+  }
+
+  // ── REQUIRED (Codex fix 1): a pack-only generation makes the lawyer-
+  // email action available and lists every pack doc plus every blank.
+  // Mirrors exactly how app/page.tsx's handleConfirmFounderPack maps the
+  // /api/founder-pack response's docs into GeneratedDoc[] before calling
+  // buildLawyerReviewEmail — the API route now returns `filled` per doc
+  // (previously only template_name + label), which is what makes this
+  // possible. ────────────────────────────────────────────────────────────
+  {
+    const profile = baseProfile({
+      state: null,
+      structure: null,
+      recommended_documents: ["Founders' Agreement", 'Independent Contractor Agreement'],
+    })
+    const result = await generateFounderPack(profile)
+    check(result.docs.length === 2, 'sanity: pack has 2 docs for this case')
+
+    // Same shape/mapping as app/page.tsx's handleConfirmFounderPack.
+    const generatedDocs: GeneratedDoc[] = result.docs.map((d) => ({
+      template: d.template_name,
+      label: d.label,
+      filled: d.filled,
+    }))
+    check(generatedDocs.length > 0, 'REQUIRED: a pack-only generation yields a non-empty generatedDocs list (lawyer-email action becomes available)')
+
+    const email = buildLawyerReviewEmail(profile, generatedDocs)
+    for (const d of result.docs) {
+      check(email.includes(`- ${d.label}`), `REQUIRED: lawyer email lists pack doc "${d.label}"`)
+      for (const blank of extractBlanks(d.filled)) {
+        check(email.includes(blank), `REQUIRED: lawyer email includes blank "${blank}" from "${d.label}"`)
+      }
+    }
   }
 
   console.log(`\n${failures === 0 ? 'PASS' : 'FAIL'}: ${checks} checks run, ${failures} failed`)

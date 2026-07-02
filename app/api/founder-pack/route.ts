@@ -76,7 +76,7 @@ export async function POST(req: Request) {
       zip_b64: zipBuffer.toString('base64'),
       zip_name: zipName,
       cover_memo: pack.coverMemo,
-      docs: pack.docs.map((d) => ({ template_name: d.template_name, label: d.label })),
+      docs: pack.docs.map((d) => ({ template_name: d.template_name, label: d.label, filled: d.filled })),
       validation: pack.profileValidation,
     })
   } catch (err: unknown) {

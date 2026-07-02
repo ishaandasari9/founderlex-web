@@ -133,7 +133,7 @@ async function generateAndDownload(
 // can surface them in the chat.
 async function generateFounderPackAndDownload(
   profile: FounderProfile | null
-): Promise<{ ok: boolean; error?: string; coverMemo?: string; docs?: { template_name: string; label: string }[] }> {
+): Promise<{ ok: boolean; error?: string; coverMemo?: string; docs?: { template_name: string; label: string; filled: string }[] }> {
   try {
     const res = await fetch('/api/founder-pack', {
       method: 'POST',
@@ -616,6 +616,12 @@ export default function Home() {
     setPackGenerating(false)
     if (result.ok) {
       setDocCount(prev => prev + (result.docs?.length ?? packConfirm.templateNames.length))
+      if (result.docs && result.docs.length > 0) {
+        setGeneratedDocs(prev => [
+          ...prev,
+          ...result.docs!.map(d => ({ template: d.template_name, label: d.label, filled: d.filled })),
+        ])
+      }
       setMessages(prev => {
         const next: Msg[] = [...prev, { role: 'bot', text: result.coverMemo ?? 'Your Founder Pack is ready and downloading now.' }]
         persistSession(next, profileRef.current)
