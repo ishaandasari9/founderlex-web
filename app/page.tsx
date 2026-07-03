@@ -405,6 +405,7 @@ export default function Home() {
   const [showCostEstimate, setShowCostEstimate] = useState(false)
   const [showCompare, setShowCompare] = useState(false)
   const [showRoadmap, setShowRoadmap] = useState(false)
+  const [showTools, setShowTools] = useState(false)
   const [enterSignal, setEnterSignal]     = useState(0)
   const [exitSignal, setExitSignal]       = useState(0)
   const [doorBusy, setDoorBusy]           = useState(false)
@@ -973,74 +974,59 @@ export default function Home() {
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3F9D6A', flexShrink: 0 }} />
                 Here with you
               </span>
-              <button onClick={() => setShowRoadmap(true)}
-                className="chat-clear-btn"
-                style={{
-                  fontFamily: MONO, fontSize: 10, letterSpacing: '0.10em', textTransform: 'uppercase',
-                  color: RED, background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                }}>
-                Your progress
-              </button>
-              <button onClick={() => setShowDeadlines(true)}
-                className="chat-clear-btn"
-                style={{
-                  fontFamily: MONO, fontSize: 10, letterSpacing: '0.10em', textTransform: 'uppercase',
-                  color: RED, background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                }}>
-                Deadlines
-              </button>
-              <button onClick={() => setShowCostEstimate(true)}
-                className="chat-clear-btn"
-                style={{
-                  fontFamily: MONO, fontSize: 10, letterSpacing: '0.10em', textTransform: 'uppercase',
-                  color: RED, background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                }}>
-                Cost & time
-              </button>
-              <button onClick={() => setShowCompare(true)}
-                className="chat-clear-btn"
-                style={{
-                  fontFamily: MONO, fontSize: 10, letterSpacing: '0.10em', textTransform: 'uppercase',
-                  color: RED, background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                }}>
-                Compare versions
-              </button>
-              <button onClick={() => setShowExplainForm(true)}
-                className="chat-clear-btn"
-                style={{
-                  fontFamily: MONO, fontSize: 10, letterSpacing: '0.10em', textTransform: 'uppercase',
-                  color: RED, background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                }}>
-                Explain a form
-              </button>
-              <button onClick={() => setShowNameSearch(true)}
-                className="chat-clear-btn"
-                style={{
-                  fontFamily: MONO, fontSize: 10, letterSpacing: '0.10em', textTransform: 'uppercase',
-                  color: RED, background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                }}>
-                Check a name
-              </button>
-              <button onClick={handleOpenFounderPack}
-                disabled={packLoadingFields}
-                className="chat-clear-btn"
-                style={{
-                  fontFamily: MONO, fontSize: 10, letterSpacing: '0.10em', textTransform: 'uppercase',
-                  color: RED, background: 'none', border: 'none', cursor: packLoadingFields ? 'default' : 'pointer', padding: 0,
-                  opacity: packLoadingFields ? 0.5 : 1,
-                }}>
-                {packLoadingFields ? 'Loading…' : 'Founder pack'}
-              </button>
-              {generatedDocs.length > 0 && (
-                <button onClick={handleOpenLawyerEmail}
+              {/* Tools menu — one entry point, each tool labeled + explained */}
+              <div style={{ position: 'relative' }}>
+                <button onClick={() => setShowTools(v => !v)}
                   className="chat-clear-btn"
+                  aria-haspopup="menu" aria-expanded={showTools}
                   style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 5,
                     fontFamily: MONO, fontSize: 10, letterSpacing: '0.10em', textTransform: 'uppercase',
                     color: RED, background: 'none', border: 'none', cursor: 'pointer', padding: 0,
                   }}>
-                  Email a lawyer
+                  Tool <span style={{ fontSize: 8, transform: showTools ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>▾</span>
                 </button>
-              )}
+                {showTools && (() => {
+                  const TOOLS: { label: string; desc: string; run: () => void; disabled?: boolean; muted?: boolean }[] = [
+                    { label: 'Your progress', desc: "Where you are and what's left to do", run: () => setShowRoadmap(true) },
+                    { label: 'Filing deadlines', desc: 'Typical dates and windows to know about', run: () => setShowDeadlines(true) },
+                    { label: 'Cost & time', desc: 'Rough fees and how long each step takes', run: () => setShowCostEstimate(true) },
+                    { label: 'Explain a document', desc: 'Paste any legal form, get it in plain English', run: () => setShowExplainForm(true) },
+                    { label: 'Compare two documents', desc: "See what's different between two versions", run: () => setShowCompare(true) },
+                    { label: 'Check a name', desc: 'Search if a business or nonprofit name is taken', run: () => setShowNameSearch(true) },
+                    { label: packLoadingFields ? 'Founder pack (loading…)' : 'Founder pack', desc: 'Download all your documents in one bundle', run: handleOpenFounderPack, disabled: packLoadingFields },
+                    { label: 'Email a lawyer', desc: generatedDocs.length > 0 ? 'Draft a review request for the docs you made' : 'Available once you create a document', run: handleOpenLawyerEmail, disabled: generatedDocs.length === 0 },
+                  ]
+                  return (
+                    <>
+                      <div onClick={() => setShowTools(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+                      <div role="menu" style={{
+                        position: 'absolute', top: 'calc(100% + 12px)', right: 0, zIndex: 50, width: 300,
+                        background: '#FFFDF9', border: '1px solid rgba(42,36,32,0.14)', borderRadius: 14,
+                        boxShadow: '0 14px 40px rgba(42,36,32,0.18)', padding: 7,
+                      }}>
+                        <div style={{ fontFamily: MONO, fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', color: FAINT, padding: '5px 9px 7px' }}>
+                          Optional tools
+                        </div>
+                        {TOOLS.map((t) => (
+                          <button key={t.label} role="menuitem" disabled={t.disabled}
+                            onClick={() => { setShowTools(false); t.run() }}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(219,26,26,0.06)' }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = 'none' }}
+                            style={{
+                              display: 'block', width: '100%', textAlign: 'left', background: 'none',
+                              border: 'none', borderRadius: 9, padding: '9px 10px',
+                              cursor: t.disabled ? 'default' : 'pointer', opacity: t.disabled ? 0.5 : 1,
+                            }}>
+                            <span style={{ display: 'block', fontFamily: BRICOLAGE, fontWeight: 600, fontSize: 13.5, color: INK }}>{t.label}</span>
+                            <span style={{ display: 'block', fontFamily: NEWSREADER, fontSize: 12, color: FAINT, marginTop: 2, lineHeight: 1.3 }}>{t.desc}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )
+                })()}
+              </div>
               {messages.length > 0 && (
                 <button onClick={handleClearSession}
                   className="chat-clear-btn"
