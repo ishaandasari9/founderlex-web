@@ -105,20 +105,44 @@ export async function extractProfile(
   )
   const input = (toolUse?.input ?? {}) as Partial<FounderProfile>
 
+  // Merge invariant (see SYSTEM_PROMPT): "Never drop a fact that was already
+  // established." The `??` operator only guards null/undefined — it does NOT
+  // guard an empty string or empty array. So if a later turn doesn't mention
+  // an already-known field and the model returns "" (the tool describes
+  // product_description as "Empty string if not discussed") or [] for it, a
+  // plain `?? base` would keep that empty value and silently wipe the
+  // established fact — e.g. the founders list or the product description
+  // vanishing mid-conversation, which then breaks document generation. For
+  // string/array fields, fall back to base whenever the incoming value is
+  // empty, not just when it's null. Booleans keep `??` on purpose: `false`
+  // is a real, established value and only `null` means "unknown".
   return {
-    company_name: input.company_name ?? base.company_name,
-    product_description: input.product_description ?? base.product_description,
+    company_name: keepIfEmptyStr(input.company_name, base.company_name),
+    product_description: keepIfEmptyStr(input.product_description, base.product_description),
     business_type: input.business_type ?? base.business_type,
-    founders: input.founders ?? base.founders,
+    founders: keepIfEmptyArr(input.founders, base.founders),
     registered: input.registered ?? base.registered,
-    structure: input.structure ?? base.structure,
-    state: input.state ?? base.state,
+    structure: keepIfEmptyStr(input.structure, base.structure),
+    state: keepIfEmptyStr(input.state, base.state),
     handles_user_data: input.handles_user_data ?? base.handles_user_data,
     has_ip: input.has_ip ?? base.has_ip,
-    taking_money_from: input.taking_money_from ?? base.taking_money_from,
-    recommended_documents: input.recommended_documents ?? base.recommended_documents,
-    confirmed_documents: input.confirmed_documents ?? base.confirmed_documents,
+    taking_money_from: keepIfEmptyStr(input.taking_money_from, base.taking_money_from),
+    recommended_documents: keepIfEmptyArr(input.recommended_documents, base.recommended_documents),
+    confirmed_documents: keepIfEmptyArr(input.confirmed_documents, base.confirmed_documents),
   }
+}
+
+// Fall back to `base` unless `next` carries a real value. Unlike `??`, an
+// empty string (or a whitespace-only string) counts as "no value" and keeps
+// the established base fact rather than overwriting it with emptiness.
+function keepIfEmptyStr<T extends string | null>(next: string | null | undefined, base: T): string | T {
+  return typeof next === 'string' && next.trim() !== '' ? next : base
+}
+
+// Same idea for arrays: an empty array means "nothing new this turn", so keep
+// whatever was already established rather than clearing it.
+function keepIfEmptyArr<T>(next: T[] | undefined, base: T[]): T[] {
+  return Array.isArray(next) && next.length > 0 ? next : base
 }
 
 function findLastIndex<T>(arr: T[], predicate: (item: T) => boolean): number {
