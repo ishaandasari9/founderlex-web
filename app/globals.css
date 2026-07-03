@@ -641,11 +641,12 @@ input { font-family: inherit; }
   .door-landing {
     padding-left: 16px !important;
     padding-right: 16px !important;
-    gap: 20px !important;
+    gap: 16px !important;
   }
 
-  .door-landing-copy {
-    font-size: 18px !important;
+  .door-landing-tagline {
+    font-size: 15px !important;
+    padding: 7px 14px !important;
   }
 
   .cta-button--lg {

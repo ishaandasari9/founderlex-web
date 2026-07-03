@@ -682,8 +682,8 @@ export default function Home() {
 
   const handleConsentDisagree = useCallback(() => {
     setShowConsent(false)
-    handleBackToDoor()
-  }, [handleBackToDoor])
+    if (act === 'about') handleBackToDoor()
+  }, [act, handleBackToDoor])
 
   const doorEnterHandoff = doorBusy && act === 'about' && !isExitingAbout
   const doorExitAnim = doorBusy && isExitingAbout
@@ -742,10 +742,32 @@ export default function Home() {
         opacity: doorEnterHandoff ? 0 : act === 'door' || doorBusy ? 1 : 0,
         pointerEvents: showDoorChrome ? 'auto' : 'none',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
-        justifyContent: 'center', gap: 'clamp(24px,5vh,52px)',
-        padding: 'clamp(28px,6vh,64px) 24px', background: CREAM,
+        justifyContent: 'center', gap: 'clamp(16px,3.5vh,36px)',
+        padding: 'clamp(20px,4vh,48px) 24px', background: CREAM,
       }}>
-        {showDoorChrome && <Wordmark size={25} />}
+        {showDoorChrome && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, textAlign: 'center' }}>
+            <Wordmark size={25} />
+            <p className="door-landing-tagline" style={{
+              margin: 0,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 9,
+              fontFamily: NEWSREADER,
+              fontSize: 'clamp(17px,1.9vw,22px)',
+              lineHeight: 1.35,
+              letterSpacing: '-0.01em',
+              color: INK,
+              background: WHITE,
+              border: '1px solid rgba(42,36,32,0.12)',
+              borderRadius: 999,
+              padding: '8px 18px',
+              boxShadow: '0 10px 24px -18px rgba(42,36,32,0.45)',
+            }}>
+              <ArchPip /> Startup legal basics, in plain English.
+            </p>
+          </div>
+        )}
 
         <DoorHero
           enterSignal={enterSignal}
@@ -757,12 +779,9 @@ export default function Home() {
         />
 
         {showDoorChrome && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, textAlign: 'center' }}>
-          <p className="door-landing-copy" style={{ margin: 0, fontFamily: NEWSREADER, fontSize: 'clamp(20px,2.2vw,27px)', lineHeight: 1.4, letterSpacing: '-0.01em', color: INK, maxWidth: '22ch' }}>
-            Startup legal basics, in plain English.{' '}<span style={{ color: FAINTER }}>Open the door.</span>
-          </p>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, textAlign: 'center' }}>
           <CtaButton onClick={handleStepInside}>
-            Step inside <ArrowRight size={18} strokeWidth={1.8} />
+            Ask your first question <ArrowRight size={18} strokeWidth={1.8} />
           </CtaButton>
           <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '0.16em', textTransform: 'uppercase', color: FAINTER }}>
             No login wall · Free to start
@@ -912,10 +931,10 @@ export default function Home() {
             </div>
           </div>
 
-          {/* CTA */}
+          {/* Secondary CTA — primary ask-input lives on the door hero */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, textAlign: 'center' }}>
             <CtaButton onClick={handleRequestChat} lg>
-              Start with a question <ArrowRight size={18} strokeWidth={1.8} />
+              Ask your first question <ArrowRight size={18} strokeWidth={1.8} />
             </CtaButton>
             <span style={{ display: 'flex', alignItems: 'flex-start', gap: 7, maxWidth: '42ch' }}>
               <ShieldCheck size={13} color={MUTED} strokeWidth={1.6} style={{ marginTop: 3, flexShrink: 0 }} aria-hidden />
