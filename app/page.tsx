@@ -25,7 +25,7 @@ import RedFlagCard from '@/components/RedFlagCard'
 import { detectRedFlags, checkAssistantOverstep, type RedFlag } from '@/lib/redFlags'
 import BeforeYouSignChecklist from '@/components/BeforeYouSignChecklist'
 import CitationChip, { type CitationLink } from '@/components/CitationChip'
-import { TEMPLATE_LABELS, detectTemplate, resolveRecommendedTemplates } from '@/lib/templateMeta'
+import { TEMPLATE_LABELS, detectTemplates, resolveRecommendedTemplates } from '@/lib/templateMeta'
 
 // ── React Bits — SSR disabled (motion/react needs window) ────────────────────
 // Cast to any to bypass TypeScript inference quirks from .jsx component files
@@ -491,8 +491,17 @@ export default function Home() {
       const next = messagesRef.current.filter(m => !m.isLoading)
       const botMsg: Msg = { role: 'bot', text: reply, citations }
       const result: Msg[] = [...next, botMsg]
-      const tpl = detectTemplate(reply)
-      if (tpl) result.push({ role: 'doc-card', text: '', template: tpl })
+      // Surface a Generate card only for a targeted recommendation, not for a
+      // catalog listing. A reply that names many documents (e.g. the "what do
+      // you make?" answer, which lists all 15) is an overview, not a
+      // recommendation — attaching a card for whichever one is named first
+      // (Advisor Agreement, first in the keyword table) is spurious. A real
+      // recommendation names at most a handful (e.g. nonprofit -> Articles +
+      // Bylaws + Conflict of Interest Policy), so cap the card at <= 4 mentions.
+      const mentionedTemplates = detectTemplates(reply)
+      if (mentionedTemplates.length >= 1 && mentionedTemplates.length <= 4) {
+        result.push({ role: 'doc-card', text: '', template: mentionedTemplates[0] })
+      }
 
       const flags = detectRedFlags(t)
       const overstep = checkAssistantOverstep(reply)

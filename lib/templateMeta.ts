@@ -56,6 +56,22 @@ export function detectTemplate(text: string): string | null {
   return null
 }
 
+// Every distinct template the text mentions, in keyword-table order. Unlike
+// detectTemplate (first match only), this lets a caller tell a targeted
+// recommendation ("you'll want a Founders' Agreement") apart from a catalog
+// listing that names many documents ("here are all 15 we make") — the chat UI
+// uses the count to decide whether to surface a Generate card at all, so a
+// "what do you make?" answer doesn't spuriously attach a card for whichever
+// document happens to be named first.
+export function detectTemplates(text: string): string[] {
+  const lower = text.toLowerCase()
+  const found: string[] = []
+  for (const [template, keywords] of Object.entries(TEMPLATE_KEYWORDS)) {
+    if (keywords.some(kw => lower.includes(kw))) found.push(template)
+  }
+  return found
+}
+
 // B2 Founder Pack: resolve FounderProfile.recommended_documents (free
 // text, whatever phrasing the extraction model used) down to template_name
 // keys via detectTemplate above. Deliberately kept in this dependency-free
