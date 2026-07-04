@@ -71,7 +71,11 @@ Independent directors (board members with no financial stake or employment relat
 
 501(c)(3) status isn't a one-time filing — it comes with ongoing obligations:
 
-- **Form 990** — an annual information return filed with the IRS. Which version (990-N, 990-EZ, or full 990) depends on the organization's gross receipts and assets; smaller organizations file simpler versions. Deadline is the 15th day of the 5th month after the fiscal year ends (e.g., May 15 for a calendar-year organization).
+- **Form 990** — an annual information return filed with the IRS. Which version depends on the organization's gross receipts and assets:
+  - **Form 990-N** (the "e-Postcard") — for the smallest organizations, those with gross receipts **normally $50,000 or less**. This is the one a small student nonprofit under $50,000 a year files.
+  - **Form 990-EZ** — for organizations with gross receipts **under $200,000** and total assets **under $500,000**.
+  - **Full Form 990** — for larger organizations, gross receipts **$200,000 or more** or total assets **$500,000 or more**.
+  These dollar thresholds can change over time, so confirm the current figures at irs.gov. The deadline is the 15th day of the 5th month after the fiscal year ends (e.g., May 15 for a calendar-year organization).
 - **State charitable solicitation registration** — most states require a nonprofit to register **before** soliciting donations from the public in that state — through a website donation button, events, direct mail, or social media fundraising — not just before receiving the money. Requirements and forms vary by state; this needs to be checked state-by-state, especially if fundraising online (which can reach donors in many states at once).
 - **Meeting minutes** — boards should keep written minutes of meetings, especially votes, as part of good governance and IRS documentation expectations.
 
