@@ -492,14 +492,11 @@ export default function Home() {
       const next = messagesRef.current.filter(m => !m.isLoading)
       const botMsg: Msg = { role: 'bot', text: reply, citations }
       const result: Msg[] = [...next, botMsg]
-      // Surface a Generate card only for a targeted recommendation, not for a
-      // catalog listing. A reply that names many documents (e.g. the "what do
-      // you make?" answer, which lists all 15) is an overview, not a
-      // recommendation — attaching a card for whichever one is named first
-      // (Advisor Agreement, first in the keyword table) is spurious. A real
-      // recommendation names at most a handful (e.g. nonprofit -> Articles +
-      // Bylaws + Conflict of Interest Policy), so cap the card at <= 4 mentions.
-      const mentionedTemplates = detectTemplates(reply)
+      // Surface a Generate card only after a current, explicit
+      // recommendation. If the assistant is still asking a question, it is
+      // gathering context; showing a form at that point makes the flow feel
+      // random and rushed.
+      const mentionedTemplates = reply.includes('?') ? [] : detectTemplates(reply)
       if (mentionedTemplates.length >= 1 && mentionedTemplates.length <= 4) {
         result.push({ role: 'doc-card', text: '', template: mentionedTemplates[0] })
       }
@@ -1212,4 +1209,3 @@ export default function Home() {
     </div>
   )
 }
-

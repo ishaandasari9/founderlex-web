@@ -2,7 +2,7 @@
 // app/page.tsx so it's usable server-side to resolve
 // FounderProfile.recommended_documents into template_name keys).
 // Deterministic, no API calls.
-import { TEMPLATE_LABELS, TEMPLATE_KEYWORDS, detectTemplate } from '../lib/templateMeta'
+import { TEMPLATE_LABELS, TEMPLATE_KEYWORDS, detectTemplate, detectTemplates } from '../lib/templateMeta'
 import { TEMPLATE_FILES } from '../lib/generateDocument'
 
 let checks = 0
@@ -40,6 +40,41 @@ check(detectTemplate('You need Articles of Incorporation first.') === 'nonprofit
 check(detectTemplate('A Statement of Work locks in scope.') === 'sow_template', 'detects "Statement of Work"')
 check(detectTemplate('This is just small talk, nothing document-related.') === null, 'returns null for text mentioning no known template')
 check(detectTemplate('') === null, 'returns null for an empty string')
+
+// ── detectTemplates: UI doc-card detection should ignore corrections or
+// apologies that mention a document only to say it was the wrong one.
+check(
+  JSON.stringify(detectTemplates("You're right, my bad, I mentioned a Founders' Agreement but I shouldn't have, since you're the sole founder.")) === '[]',
+  'does not surface a card for a corrected-away Founders Agreement mention',
+)
+check(
+  JSON.stringify(detectTemplates("I didn't generate a Founders Agreement for you, and I should not recommend it for a solo founder.")) === '[]',
+  'does not surface a card for a negated Founders Agreement mention',
+)
+check(
+  JSON.stringify(detectTemplates("Since you have two co-founders building a product, the Founders' Agreement is your most important first document.")) === JSON.stringify(['founders_agreement']),
+  'still surfaces a card for an affirmative Founders Agreement recommendation',
+)
+check(
+  JSON.stringify(detectTemplates("Once your LLC is formed, we can also help you draft starter documents like Terms of Service and a Privacy Policy if you're collecting customer data, or a Founders' Agreement if you bring on co-founders later.")) === '[]',
+  'does not surface a card for future hypothetical document mentions',
+)
+check(
+  JSON.stringify(detectTemplates("What I can help with is explaining what you need to think about as you're setting up, like whether you have IP to protect, if you'll be sharing confidential info with clients before contracts are signed, or if you need terms of service for the websites you're selling.")) === '[]',
+  'does not surface a card for exploratory follow-up topic menus',
+)
+check(
+  JSON.stringify(detectTemplates("Once your LLC is formed, I can help you with the contracts and policies that matter for your business, like terms of service for your clients, any confidentiality agreements if you're sharing your process or tools, or client service contracts.")) === '[]',
+  'does not surface a card for broad post-formation topic menus',
+)
+check(
+  JSON.stringify(detectTemplates('To point you to the right document, are you collecting customer data, hiring someone, or just trying to understand LLC formation first?')) === '[]',
+  'does not surface a card while the assistant is still asking clarifying questions',
+)
+check(
+  JSON.stringify(detectTemplates('Since you collect customer data and sell directly through the site, Terms of Service is a foundational document for your current situation.')) === JSON.stringify(['terms_of_service']),
+  'surfaces a card for an explicit current Terms of Service recommendation',
+)
 
 console.log(`\n${failures === 0 ? 'PASS' : 'FAIL'}: ${checks} checks run, ${failures} failed`)
 if (failures > 0) process.exit(1)

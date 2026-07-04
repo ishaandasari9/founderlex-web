@@ -56,20 +56,72 @@ export function detectTemplate(text: string): string | null {
   return null
 }
 
-// Every distinct template the text mentions, in keyword-table order. Unlike
-// detectTemplate (first match only), this lets a caller tell a targeted
-// recommendation ("you'll want a Founders' Agreement") apart from a catalog
-// listing that names many documents ("here are all 15 we make") — the chat UI
-// uses the count to decide whether to surface a Generate card at all, so a
-// "what do you make?" answer doesn't spuriously attach a card for whichever
-// document happens to be named first.
+// Every distinct template the text recommends for the user's current situation,
+// in keyword-table order. Unlike detectTemplate (first match only and broad by
+// design), this is intentionally strict because the chat UI uses it to surface
+// Generate cards. A casual mention, topic menu, future hypothetical, correction,
+// or answer that is still asking a clarifying question must not become a form.
 export function detectTemplates(text: string): string[] {
   const lower = text.toLowerCase()
   const found: string[] = []
   for (const [template, keywords] of Object.entries(TEMPLATE_KEYWORDS)) {
-    if (keywords.some(kw => lower.includes(kw))) found.push(template)
+    if (keywords.some(kw => hasCurrentRecommendationMention(lower, kw))) found.push(template)
   }
   return found
+}
+
+function hasCurrentRecommendationMention(lowerText: string, keyword: string): boolean {
+  let index = lowerText.indexOf(keyword)
+  while (index !== -1) {
+    if (isCurrentRecommendationMention(lowerText, index, keyword.length)) return true
+    index = lowerText.indexOf(keyword, index + keyword.length)
+  }
+  return false
+}
+
+function isCurrentRecommendationMention(lowerText: string, index: number, length: number): boolean {
+  if (isNonRecommendationMention(lowerText, index, length)) return false
+
+  const sentence = getSentenceWindow(lowerText, index, length)
+  if (sentence.includes('?')) return false
+
+  const before = lowerText.slice(Math.max(0, index - 120), index)
+  const after = lowerText.slice(index + length, Math.min(lowerText.length, index + length + 120))
+  const window = `${before}__doc__${after}`
+
+  return [
+    /(?:you(?:'ll| will)?\s+(?:need|want)|you should|you can start with|start with|i(?:'d| would)? recommend|my recommendation is|the right document is|the main document is|the first document is|get|draft|prepare|use)\s+(?:a\s+|an\s+|the\s+)?__doc__/,
+    /__doc__\s+(?:is|are)\s+(?:your|the|a)\s+(?:right|main|first|next|most important|best|core|foundational)\b/,
+    /__doc__\s+(?:covers|locks in|protects|sets|governs|handles|fits)\b[^.?!]{0,80}\b(?:this|your|for you|situation|equity|scope|relationship|data|rules|board)/,
+    /(?:i|we|founderlex)\s+can\s+(?:draft|generate|prepare)\s+(?:a\s+|an\s+|the\s+)?__doc__/,
+  ].some(pattern => pattern.test(window))
+}
+
+function getSentenceWindow(lowerText: string, index: number, length: number): string {
+  const startCandidates = ['.', '!', '?', '\n'].map(mark => lowerText.lastIndexOf(mark, index - 1))
+  const start = Math.max(-1, ...startCandidates) + 1
+  const endCandidates = ['.', '!', '?', '\n']
+    .map(mark => lowerText.indexOf(mark, index + length))
+    .filter(pos => pos !== -1)
+  const end = endCandidates.length > 0 ? Math.min(...endCandidates) + 1 : lowerText.length
+  return lowerText.slice(start, end)
+}
+
+function isNonRecommendationMention(lowerText: string, index: number, length: number): boolean {
+  const before = lowerText.slice(Math.max(0, index - 90), index)
+  const after = lowerText.slice(index + length, Math.min(lowerText.length, index + length + 90))
+  const window = `${before}__doc__${after}`
+
+  return [
+    /(?:shouldn't|should not|didn't|did not|don't|do not|won't|will not|can't|cannot|isn't|is not|wasn't|was not|no need to|no longer need)\s+(?:have\s+)?(?:mentioned|mention|generated?|generate|recommend(?:ed)?|surface|show|use|need)\s+(?:a\s+|an\s+|the\s+)?__doc__/,
+    /(?:my bad|mistake|wrong)\b[^.?!]{0,80}__doc__/,
+    /__doc__[^.?!]{0,80}\b(?:isn't|is not|wasn't|was not|doesn't fit|does not fit|is wrong|was wrong|isn't the right|is not the right)\b/,
+    /(?:can also help|could also help|we can also help|we could also help|later|eventually|down the road)\b[^.?!]{0,80}__doc__/,
+    /(?:like|such as|including|possible|next topics?|any)\b[^.?!]{0,120}__doc__/,
+    /(?:like whether|whether|or if|if)\s+you\b[^.?!]{0,80}\b(?:need|have|will|might|plan to)\b[^.?!]{0,80}__doc__/,
+    /__doc__[^.?!]{0,80}\b(?:if|when|once|whether)\s+you\b[^.?!]{0,80}\b(?:need|have|will|might|plan to|later|eventually|down the road|bring on|hire|collect|start)\b/,
+    /__doc__[^.?!]{0,80}\b(?:if|when|once)\s+you\b[^.?!]{0,80}\b(?:later|eventually|down the road|bring on|hire|collect|start)\b/,
+  ].some(pattern => pattern.test(window))
 }
 
 // B2 Founder Pack: resolve FounderProfile.recommended_documents (free
