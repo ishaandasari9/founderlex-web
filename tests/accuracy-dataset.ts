@@ -334,6 +334,38 @@ export const ACCURACY_DATASET: AccuracyCase[] = [
     'nonprofit-basics.md',
   ),
 
+  // A1 benchmark Q6 (990-N reference-selection gap). Deliberately phrased
+  // WITHOUT the literal "501(c)(3)" token and with business_type unknown, so
+  // this case only grounds if the plain "small nonprofit ... under $50,000"
+  // wording pulls in nonprofit-basics.md (via the 'nonprofit' / 'annual
+  // return' / 'gross receipts' keywords added for this gap). In run 1 the
+  // product deferred here instead of naming Form 990-N.
+  inScope(
+    'AC-36',
+    'Which annual IRS return does a small nonprofit with gross receipts normally under $50,000 have to file?',
+    [
+      'Form 990-N (the e-Postcard) is the annual return for the smallest organizations',
+      'It applies to those with gross receipts normally $50,000 or less',
+    ],
+    'nonprofit-basics.md',
+  ),
+
+  // A1 benchmark Q9 (contractor-IP reference-selection gap). The question
+  // never uses the word "IP" or "copyright", so before the work-for-hire /
+  // "owns the work" keywords were added it grounded on nothing and the model
+  // answered from general knowledge. ip-basics.md Section 2 is the correct
+  // source (contractor IP-assignment / work-for-hire).
+  inScope(
+    'AC-37',
+    'When I hire my first contractor, what clause makes sure my company owns the work they produce?',
+    [
+      'An intellectual-property assignment clause is what transfers ownership to the company',
+      'Without a signed assignment, a contractor can retain copyright in what they made even though you paid for it',
+      'This should be signed before the contractor starts work',
+    ],
+    'ip-basics.md',
+  ),
+
   // ── Out-of-scope rows (in_scope=false) — 2 per GUARD_CATEGORIES entry ────
   // These double as the scope-refusal test called for in README-v3 A1.
   outOfScope('AC-26', 'I just got a subpoena related to my startup, what should I do?', [

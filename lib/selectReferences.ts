@@ -10,7 +10,14 @@ interface TopicRule {
 const TOPIC_RULES: TopicRule[] = [
   {
     file: 'ip-basics.md',
-    keywords: ['trademark', 'copyright', 'patent', 'trade secret', 'nda', 'non-disclosure', 'intellectual property', ' ip ', 'logo', 'brand name', 'invention'],
+    // IP-ownership / work-for-hire phrasings added (A1 benchmark Q9 gap): the
+    // contractor-IP question ("what clause makes sure my company owns the
+    // work they produce?") and its variants ("own the code a freelancer
+    // writes") matched NO keyword — no "copyright", no "IP" — so ip-basics.md
+    // (whose Section 2 is exactly the contractor IP-assignment / work-for-hire
+    // material) never loaded and the answer was ungrounded. These concept
+    // phrases pull it in even when the founder never uses the word "IP".
+    keywords: ['trademark', 'copyright', 'patent', 'trade secret', 'nda', 'non-disclosure', 'intellectual property', ' ip ', 'logo', 'brand name', 'invention', 'work for hire', 'work-for-hire', 'work made for hire', 'owns the work', 'own the work', 'owns the code', 'own the code', 'ip assignment', 'assign the ip', 'assignment of ip', 'who owns the'],
   },
   {
     file: 'business-structures.md',
@@ -61,7 +68,18 @@ const TOPIC_RULES: TopicRule[] = [
     // added (A1 accuracy benchmark, Codex audit), following the same
     // pattern as the existing donation-acknowledgment keywords: pulls in
     // this file even before business_type is known to be 'nonprofit'.
-    keywords: ['501(c)(3)', '501c3', 'bylaws', 'board of directors', 'conflict of interest', 'form 1023', 'form 990', 'donation acknowledgment', 'donation receipt', 'charitable contribution receipt', 'charitable solicitation', 'solicit donations', 'taking donations'],
+    //
+    // 'nonprofit' / 'non-profit' / '990' / 'e-postcard' / 'annual return' /
+    // 'gross receipts' added (A1 benchmark Q6, 990-N gap): the benchmark's
+    // small-nonprofit annual-return question ("which annual IRS return does
+    // a small 501(c)(3) with gross receipts normally under $50,000 file?")
+    // only matched via the literal '501(c)(3)' token. A founder phrasing the
+    // same question as "my small nonprofit under $50k" — before business_type
+    // is known to be 'nonprofit' — matched no keyword at all, so this file
+    // (which DOES name Form 990-N and its $50,000 threshold) never loaded and
+    // the model deferred instead of answering. These pull it in on the plain
+    // wording too.
+    keywords: ['501(c)(3)', '501c3', 'nonprofit', 'non-profit', 'bylaws', 'board of directors', 'conflict of interest', 'form 1023', 'form 990', '990-n', 'e-postcard', 'e postcard', 'annual return', 'gross receipts', 'donation acknowledgment', 'donation receipt', 'charitable contribution receipt', 'charitable solicitation', 'solicit donations', 'taking donations'],
   },
 ]
 

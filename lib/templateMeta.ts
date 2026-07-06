@@ -91,7 +91,15 @@ function isCurrentRecommendationMention(lowerText: string, index: number, length
 
   return [
     /(?:you(?:'ll| will)?\s+(?:need|want)|you should|you can start with|start with|i(?:'d| would)? recommend|my recommendation is|the right document is|the main document is|the first document is|get|draft|prepare|use)\s+(?:a\s+|an\s+|the\s+)?__doc__/,
-    /__doc__\s+(?:is|are)\s+(?:your|the|a)\s+(?:right|main|first|next|most important|best|core|foundational)\b/,
+    // Up to two intervening intensifier words are allowed between the article
+    // and the ranking word ("your SINGLE most important document", "the ABSOLUTE
+    // first thing", "your BY FAR best option"). Without this, a very common,
+    // clearly-recommending phrasing the model actually produces — "the Founders'
+    // Agreement is your single most important early document" — matched nothing,
+    // so no Generate card surfaced even though the reply told the user to click
+    // Generate on the card (found in live Chrome testing). Negations are still
+    // filtered first by isNonRecommendationMention, so this stays recommendation-only.
+    /__doc__\s+(?:is|are)\s+(?:your|the|a)\s+(?:\w+\s+){0,2}(?:right|main|first|next|most important|best|core|foundational)\b/,
     /__doc__\s+(?:covers|locks in|protects|sets|governs|handles|fits)\b[^.?!]{0,80}\b(?:this|your|for you|situation|equity|scope|relationship|data|rules|board)/,
     /(?:i|we|founderlex)\s+can\s+(?:draft|generate|prepare)\s+(?:a\s+|an\s+|the\s+)?__doc__/,
   ].some(pattern => pattern.test(window))

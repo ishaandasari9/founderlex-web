@@ -4,6 +4,7 @@ import { join } from 'path'
 import { detectOutOfScope, GUARD_CATEGORIES } from './outOfScopeGuard'
 import { containsForbiddenAssertion } from './forbiddenAssertions'
 import { runVerifiedAnswer, verifyAnswer, isSmallTalkDraft, logVerifierEvent } from './runtimeVerifier'
+import { isMetaProductQuestion } from './metaQuestion'
 
 let _client: Anthropic | null = null
 function getClient() {
@@ -240,7 +241,16 @@ export async function getChatResponse(
   // the answer is what gets classified. Small talk skips straight to layer
   // 4 below — there's no legal claim in "You're welcome!" for a verifier
   // to check.
-  if (isSmallTalkDraft(draft)) {
+  //
+  // A clear product/meta question about FounderLex itself ("what can you
+  // do?", "are you free?", "what documents do you make?") skips the verifier
+  // for the same reason: its answer is a product fact, not a legal-safety
+  // claim, so there is nothing for the verifier to check — yet routing it
+  // through anyway meant a verifier timeout or malformed verdict (both fail
+  // closed) could swap a good product answer for the safety fallback, i.e.
+  // the tool "refusing" to say what it does. The out-of-scope guard above
+  // still ran first; the layer-4 backstop below still runs after.
+  if (isSmallTalkDraft(draft) || isMetaProductQuestion(lastUserMessage)) {
     return finalizeChatResponse(draft)
   }
 

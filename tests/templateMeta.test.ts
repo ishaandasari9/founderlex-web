@@ -55,6 +55,17 @@ check(
   JSON.stringify(detectTemplates("Since you have two co-founders building a product, the Founders' Agreement is your most important first document.")) === JSON.stringify(['founders_agreement']),
   'still surfaces a card for an affirmative Founders Agreement recommendation',
 )
+// Regression (live Chrome test): an intensifier adverb between the article and
+// the ranking word ("your SINGLE most important") used to defeat detection, so
+// no Generate card surfaced even though the reply told the user to click one.
+check(
+  JSON.stringify(detectTemplates("The Founders' Agreement is your single most important early document because it locks in the 50/50 split and vesting.")) === JSON.stringify(['founders_agreement']),
+  'surfaces a card when an intensifier ("single") sits before the ranking word',
+)
+check(
+  JSON.stringify(detectTemplates("The Mutual NDA is the absolute first thing you should set up before those conversations.")) === JSON.stringify(['mutual_nda']),
+  'surfaces a card for "the absolute first thing" intensifier phrasing',
+)
 check(
   JSON.stringify(detectTemplates("Once your LLC is formed, we can also help you draft starter documents like Terms of Service and a Privacy Policy if you're collecting customer data, or a Founders' Agreement if you bring on co-founders later.")) === '[]',
   'does not surface a card for future hypothetical document mentions',

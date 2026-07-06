@@ -45,7 +45,8 @@
     "test:generate-document": "npx tsx tests/generateDocument.test.ts",
     "test:template-meta": "npx tsx tests/templateMeta.test.ts",
     "test:founder-pack": "npx tsx tests/founderPack.test.ts",
-    "test:org-type-disambiguation": "npx tsx tests/orgTypeDisambiguation.test.ts"
+    "test:org-type-disambiguation": "npx tsx tests/orgTypeDisambiguation.test.ts",
+    "test:meta-question": "npx tsx tests/metaQuestion.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",
