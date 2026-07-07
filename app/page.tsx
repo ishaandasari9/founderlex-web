@@ -75,6 +75,14 @@ interface Msg {
   flags?: RedFlag[]
   isLoading?: boolean
   citations?: CitationLink[]
+  // doc-card only: whether the reply that produced this card recommended 2+
+  // documents together (vs. just this one). Captured at creation time from
+  // detectTemplates(reply) rather than re-derived later from profile state —
+  // profile.recommended_documents is extracted by a separate model call
+  // BEFORE this reply is generated (app/api/chat/route.ts calls
+  // extractProfile() ahead of getChatResponse()), so it can still lag behind
+  // the very reply that first recommends multiple documents together.
+  multiRecommended?: boolean
 }
 
 // ── Brand tokens ─────────────────────────────────────────────────────────────
@@ -942,6 +950,15 @@ export default function Home() {
     setMessages([])
     setProfile(null)
     setConfirmPanel(null)
+    setPackConfirm(null)
+    setDocCount(0)
+    setGeneratedDocs([])
+    setPreviewTemplate(null)
+    setPreviewPanelOpen(false)
+    setShowPreviewDrawer(false)
+    setSidePreviewEnabled(false)
+    setDraftQuantity(null)
+    setDraftQuantityTemplate(null)
   }, [])
 
 
@@ -987,12 +1004,14 @@ export default function Home() {
       // random and rushed.
       const mentionedTemplates = reply.includes('?') ? [] : detectTemplates(reply)
       if (mentionedTemplates.length >= 1 && mentionedTemplates.length <= 4) {
-        // One card + the draft-quantity chooser: "One document" drafts this
-        // template, "Three documents" bundles all recommended docs (Founder
-        // Pack). A multi-document recommendation is handled by that chooser, not
-        // by stacking a separate card per template.
-        result.push({ role: 'doc-card', text: '', template: mentionedTemplates[0] })
-        setDraftQuantity(null)
+        // One card +, only when this reply recommended 2+ documents together,
+        // the draft-quantity chooser: "One document" drafts this template,
+        // "Three documents" bundles all recommended docs (Founder Pack). When
+        // only one document was recommended there is nothing to bundle, so
+        // the card goes straight to a single-document draft.
+        const multiRecommended = mentionedTemplates.length >= 2
+        result.push({ role: 'doc-card', text: '', template: mentionedTemplates[0], multiRecommended })
+        setDraftQuantity(multiRecommended ? null : 1)
         setDraftQuantityTemplate(mentionedTemplates[0])
       }
 
@@ -1105,6 +1124,16 @@ export default function Home() {
     activeDraftModeRef.current = q === 1 ? 'single' : 'triple'
     if (q === 3) setSidePreviewEnabled(true)
   }, [])
+
+  // Skips the One/Three chooser entirely when only one document is actually
+  // recommended for the user's situation — there is nothing to bundle, so
+  // offering a "Three documents" option would be misleading.
+  const handleStartSingleDraft = useCallback(async (template: string) => {
+    activeDraftModeRef.current = 'single'
+    setDraftQuantity(1)
+    setDraftQuantityTemplate(template)
+    await handleOpenConfirm(template)
+  }, [handleOpenConfirm])
 
   const handleConfirmGenerate = useCallback(async () => {
     if (!confirmPanel) return
@@ -1686,12 +1715,13 @@ export default function Home() {
                 {messages.map((m, i) => {
                   if (m.role === 'doc-card' && m.template) {
                     const existing = generatedDocs.find(d => d.template === m.template)
-                    const quantityReady = draftQuantityTemplate === m.template && draftQuantity !== null
+                    const multiRecommended = !!m.multiRecommended
+                    const quantityReady = !multiRecommended || (draftQuantityTemplate === m.template && draftQuantity !== null)
                     return (
                       <div key={i} className="chat-turn chat-turn--bot chat-turn--card">
                         <DoorGlyph w={20} h={22} panelTop={7} outerR={10} innerR={4} />
                         <div className="chat-doc-flow">
-                          {!existing && (
+                          {!existing && multiRecommended && (
                             <DraftQuantityPicker
                               template={m.template}
                               selected={draftQuantityTemplate === m.template ? draftQuantity : null}
@@ -1705,8 +1735,10 @@ export default function Home() {
                             onGenerate={() => {
                               if (existing) {
                                 document.getElementById(`doc-artifact-${m.template}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-                              } else {
+                              } else if (multiRecommended) {
                                 handleStartDraft(m.template!)
+                              } else {
+                                handleStartSingleDraft(m.template!)
                               }
                             }}
                             generating={generatingTpl === m.template || packLoadingFields}

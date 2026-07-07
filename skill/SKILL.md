@@ -100,6 +100,8 @@ The answer to Q2 determines the branch below.
 
 ### Step 2B — Follow-up for a Consulting / Services company
 
+These are not a required sequence to march through — they're a menu to pick from. Stop as soon as one answer clearly points to a document in the recommendation logic below; do not keep asking the rest "for completeness." Most single-engagement questions (sharing something before a deal is signed, starting one project, hiring one contractor) only need **one** of Q3–Q7 answered before you can recommend — for example, if the founder already told you they're about to share their approach with a prospective client, that alone is enough to recommend the Mutual NDA; don't also ask about registration status or how they get paid first.
+
 3. **Who are your clients?** (other businesses, individuals, a specific industry like healthcare or legal)
 4. **Have you registered a business yet?** (no / sole proprietorship / LLC / C-Corp / other — and which state)
 5. **Do you use your own proprietary frameworks, tools, or methodologies?** (This affects which IP clause goes in your contracts — you keep your methods; the client owns the deliverable you make for them.)

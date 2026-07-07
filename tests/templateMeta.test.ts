@@ -2,7 +2,7 @@
 // app/page.tsx so it's usable server-side to resolve
 // FounderProfile.recommended_documents into template_name keys).
 // Deterministic, no API calls.
-import { TEMPLATE_LABELS, TEMPLATE_KEYWORDS, detectTemplate, detectTemplates } from '../lib/templateMeta'
+import { TEMPLATE_LABELS, TEMPLATE_KEYWORDS, detectTemplate, detectTemplates, resolveRecommendedTemplates } from '../lib/templateMeta'
 import { TEMPLATE_FILES } from '../lib/generateDocument'
 
 let checks = 0
@@ -103,6 +103,27 @@ check(
 check(
   JSON.stringify(detectTemplates('Since you collect customer data and sell directly through the site, Terms of Service is a foundational document for your current situation.')) === JSON.stringify(['terms_of_service']),
   'surfaces a card for an explicit current Terms of Service recommendation',
+)
+
+// ── resolveRecommendedTemplates: app/page.tsx uses this to resolve
+// FounderProfile.recommended_documents (free text) into template_name keys
+// for the Founder Pack bundle (handleOpenFounderPack / handleOpenTriplePack).
+check(
+  resolveRecommendedTemplates({ recommended_documents: ["Mutual NDA"] }).length === 1,
+  'resolves a single recommended_documents entry to exactly one template',
+)
+check(
+  resolveRecommendedTemplates({ recommended_documents: [] }).length === 0,
+  'resolves an empty recommended_documents list to zero templates',
+)
+check(
+  JSON.stringify(resolveRecommendedTemplates({ recommended_documents: ["Founders' Agreement", 'Mutual NDA', 'Terms of Service'] })) ===
+    JSON.stringify(['founders_agreement', 'mutual_nda', 'terms_of_service']),
+  'resolves multiple recommended_documents entries to their template keys, in order',
+)
+check(
+  resolveRecommendedTemplates({ recommended_documents: ['Mutual NDA', 'Mutual NDA'] }).length === 1,
+  'dedupes repeated recommended_documents entries that resolve to the same template',
 )
 
 console.log(`\n${failures === 0 ? 'PASS' : 'FAIL'}: ${checks} checks run, ${failures} failed`)
