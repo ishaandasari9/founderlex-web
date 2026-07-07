@@ -871,6 +871,40 @@ input { font-family: inherit; }
   margin-top: 1px;
 }
 
+.chat-rail-next {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(219, 26, 26, 0.18);
+  background: rgba(219, 26, 26, 0.05);
+}
+
+.chat-rail-next__eyebrow {
+  font-family: var(--font-mono), monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #DB1A1A;
+}
+
+.chat-rail-next__title {
+  font-family: var(--font-bricolage), sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  color: #2A2420;
+}
+
+.chat-rail-next__body {
+  margin: 0;
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: #6F655B;
+}
+
 .chat-tools-list {
   list-style: none;
   margin: 0;
@@ -2083,5 +2117,278 @@ input { font-family: inherit; }
   /* Keep door swing visible even with reduce-motion OS setting */
   .door-leaf {
     transition: transform 760ms cubic-bezier(.62, 0, .30, 1), box-shadow 760ms ease !important;
+  }
+}
+
+/* ─── Onboarding: quick-tour prompt + coach-mark tour ────────────────────────
+   Deliberately no full-page backdrop anywhere here — .tutorial-ring and
+   .tutorial-card are the only fixed elements, both sized to their own
+   content, so there is nothing that could ever intercept a click meant for
+   the app underneath. */
+@keyframes tutorial-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.tutorial-prompt {
+  position: fixed;
+  z-index: 90;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: 320px;
+  padding: 16px 18px;
+  background: #FFFFFF;
+  border: 1px solid rgba(42, 36, 32, 0.12);
+  border-radius: 14px;
+  box-shadow: 0 20px 40px -18px rgba(42, 36, 32, 0.35);
+  animation: tutorial-fade-in 220ms ease-out both;
+}
+
+.tutorial-prompt__close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: #9B8F82;
+  cursor: pointer;
+}
+
+.tutorial-prompt__close:hover {
+  background: rgba(42, 36, 32, 0.06);
+  color: #2A2420;
+}
+
+.tutorial-prompt__icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: rgba(219, 26, 26, 0.08);
+  color: #DB1A1A;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tutorial-prompt__text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+  padding-right: 14px;
+}
+
+.tutorial-prompt__title {
+  font-family: var(--font-bricolage), sans-serif;
+  font-weight: 600;
+  font-size: 14.5px;
+  color: #2A2420;
+}
+
+.tutorial-prompt__body {
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #6F655B;
+}
+
+.tutorial-prompt__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.tutorial-prompt__skip {
+  font-family: var(--font-bricolage), sans-serif;
+  font-weight: 500;
+  font-size: 12.5px;
+  color: #6F655B;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 2px;
+}
+
+.tutorial-prompt__skip:hover {
+  color: #2A2420;
+}
+
+.tutorial-prompt__start {
+  font-family: var(--font-bricolage), sans-serif;
+  font-weight: 600;
+  font-size: 12.5px;
+  color: #F7F2EB;
+  background: #DB1A1A;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  white-space: nowrap;
+}
+
+.tutorial-prompt__start:hover {
+  background: #C21717;
+}
+
+.tutorial-ring {
+  position: fixed;
+  z-index: 90;
+  border-radius: 12px;
+  border: 2px solid #DB1A1A;
+  box-shadow: 0 0 0 4px rgba(219, 26, 26, 0.14), 0 0 0 9999px rgba(42, 36, 32, 0.06);
+  pointer-events: none;
+  transition: top 0.3s ease, left 0.3s ease, width 0.3s ease, height 0.3s ease, opacity 0.2s ease;
+}
+
+.tutorial-card {
+  position: fixed;
+  z-index: 91;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(380px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 18px;
+  background: #FFFFFF;
+  border: 1px solid rgba(42, 36, 32, 0.12);
+  border-radius: 14px;
+  box-shadow: 0 20px 40px -18px rgba(42, 36, 32, 0.35);
+  animation: tutorial-fade-in 220ms ease-out both;
+}
+
+/* Used when the highlighted target sits in the lower half of the viewport
+   (e.g. the chat input), so the card doesn't sit on top of — and intercept
+   clicks on — the very control the step is explaining. */
+.tutorial-card--top {
+  top: 24px;
+  bottom: auto;
+}
+
+.tutorial-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tutorial-card__step {
+  font-family: var(--font-mono), monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9B8F82;
+}
+
+.tutorial-card__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: #9B8F82;
+  cursor: pointer;
+}
+
+.tutorial-card__close:hover {
+  background: rgba(42, 36, 32, 0.06);
+  color: #2A2420;
+}
+
+.tutorial-card__title {
+  margin: 0;
+  font-family: var(--font-bricolage), sans-serif;
+  font-weight: 600;
+  font-size: 16px;
+  color: #2A2420;
+}
+
+.tutorial-card__body {
+  margin: 0;
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: #6F655B;
+}
+
+.tutorial-card__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.tutorial-card__skip {
+  font-family: var(--font-bricolage), sans-serif;
+  font-weight: 500;
+  font-size: 12.5px;
+  color: #9B8F82;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 2px;
+}
+
+.tutorial-card__skip:hover {
+  color: #6F655B;
+}
+
+.tutorial-card__nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tutorial-card__btn {
+  font-family: var(--font-bricolage), sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  border: none;
+  transition: background 0.15s ease;
+}
+
+.tutorial-card__btn--primary {
+  color: #F7F2EB;
+  background: #DB1A1A;
+}
+
+.tutorial-card__btn--primary:hover {
+  background: #C21717;
+}
+
+.tutorial-card__btn--secondary {
+  color: #6F655B;
+  background: rgba(42, 36, 32, 0.06);
+}
+
+.tutorial-card__btn--secondary:hover {
+  background: rgba(42, 36, 32, 0.10);
+}
+
+@media (max-width: 640px) {
+  .tutorial-prompt {
+    left: 16px;
+    right: 16px;
+    max-width: none;
   }
 }

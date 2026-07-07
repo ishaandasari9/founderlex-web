@@ -16,6 +16,8 @@ import { buildLawyerReviewEmail, extractBlanks, type GeneratedDoc } from '@/lib/
 import ConfirmDocPanel, { type ConfirmPanelState } from '@/components/ConfirmDocPanel'
 import ConfirmPackPanel, { type ConfirmPackPanelState } from '@/components/ConfirmPackPanel'
 import ConsentGate from '@/components/ConsentGate'
+import TutorialPrompt from '@/components/TutorialPrompt'
+import TutorialTour, { type TutorialStep } from '@/components/TutorialTour'
 import LawyerReviewEmailPanel from '@/components/LawyerReviewEmailPanel'
 import NameSearchPanel from '@/components/NameSearchPanel'
 import ReadAloudButton from '@/components/ReadAloudButton'
@@ -618,6 +620,11 @@ interface RoadmapStepBrief {
   id: string
   title: string
   status: RoadmapStepStatus
+  // /api/roadmap already returns this per step (lib/foundingRoadmap.ts) —
+  // only pulled in here for the "what's next" callout below; the fuller
+  // whatItIs explanation stays exclusive to the full RoadmapPanel modal so
+  // this at-a-glance rail doesn't turn into a second copy of it.
+  nextAction: string
 }
 
 interface RoadmapBrief {
@@ -648,7 +655,7 @@ function ProgressRail({
         if (data.roadmap) {
           setRoadmap({
             headline: data.roadmap.headline as string,
-            steps: (data.roadmap.steps as { id: string; title: string; status: RoadmapStepStatus }[]).slice(0, 5),
+            steps: (data.roadmap.steps as RoadmapStepBrief[]).slice(0, 5),
           })
         }
       })
@@ -658,7 +665,7 @@ function ProgressRail({
   }, [docCount])
 
   return (
-    <div className="chat-rail-section chat-rail-section--progress">
+    <div className="chat-rail-section chat-rail-section--progress" data-tutorial="progress-dashboard">
       <div className="chat-rail-section__head-row">
         <button type="button" className="chat-rail-section__head" onClick={onOpenFull}>
           <span className="chat-rail-section__title">Your progress</span>
@@ -692,6 +699,17 @@ function ProgressRail({
               </li>
             ))}
           </ul>
+          {(() => {
+            const current = roadmap.steps.find(s => s.status === 'current')
+            if (!current) return null
+            return (
+              <div className="chat-rail-next">
+                <span className="chat-rail-next__eyebrow">What&apos;s next</span>
+                <span className="chat-rail-next__title">{current.title}</span>
+                <p className="chat-rail-next__body">{current.nextAction}</p>
+              </div>
+            )
+          })()}
         </>
       )}
     </div>
@@ -712,7 +730,7 @@ function ToolsNav({
   tools, compact = false, onClose,
 }: { tools: ChatToolItem[]; compact?: boolean; onClose?: () => void }) {
   return (
-    <nav className="chat-rail-section chat-rail-tools" aria-label="Optional tools">
+    <nav className="chat-rail-section chat-rail-tools" aria-label="Optional tools" data-tutorial="tool-menu">
       {!compact && (
         <>
           <div className="chat-rail-section__head-row">
@@ -930,7 +948,7 @@ function LeftRail({
               <ProgressRail docCount={docCount} onOpenFull={onOpenRoadmap} onClose={onCloseProgress} />
             )}
             {!compact && !progressOpen && (
-              <button type="button" className="chat-rail-reopen" onClick={onOpenProgress}>
+              <button type="button" className="chat-rail-reopen" onClick={onOpenProgress} data-tutorial="progress-dashboard">
                 <MapIcon size={14} color={RED} strokeWidth={1.6} /> Your progress
               </button>
             )}
@@ -938,7 +956,7 @@ function LeftRail({
               <ToolsNav tools={tools} compact={compact} onClose={compact ? undefined : onCloseTools} />
             )}
             {!compact && !toolsOpen && (
-              <button type="button" className="chat-rail-reopen" onClick={onOpenTools}>
+              <button type="button" className="chat-rail-reopen" onClick={onOpenTools} data-tutorial="tool-menu">
                 <BookOpen size={14} color={RED} strokeWidth={1.6} /> Optional tools
               </button>
             )}
@@ -948,7 +966,7 @@ function LeftRail({
           <>
             {toolsOpen && <ToolsNav tools={tools} compact />}
             {!toolsOpen && (
-              <button type="button" className="chat-rail-reopen chat-rail-reopen--icon" onClick={onOpenTools} title="Show optional tools">
+              <button type="button" className="chat-rail-reopen chat-rail-reopen--icon" onClick={onOpenTools} title="Show optional tools" data-tutorial="tool-menu">
                 <BookOpen size={16} color={RED} strokeWidth={1.6} />
               </button>
             )}
@@ -959,6 +977,42 @@ function LeftRail({
   )
 }
 
+
+// ── Quick tour steps ─────────────────────────────────────────────────────────
+// Two of these five targets don't reliably exist for a brand-new session —
+// a doc-card only appears once the assistant recommends something, and
+// "Clear conversation" only renders once messages.length > 0. Rather than
+// requiring the exact interactive element to exist yet (and needing a
+// skip-if-missing fallback), those two steps point at the stable
+// containers that are always mounted (the message list, the header
+// actions row) with copy describing what appears there.
+const TUTORIAL_STEPS: TutorialStep[] = [
+  {
+    target: '[data-tutorial="chat-input"]',
+    title: 'Ask anything, in your own words',
+    body: 'Type what you’re building or a legal-basics question here, then press Enter or tap send. No legal vocabulary needed.',
+  },
+  {
+    target: '[data-tutorial="tool-menu"]',
+    title: 'Optional tools',
+    body: 'Extra helpers — cost estimates, filing deadlines, name search, and more — live here. You never need them just to draft a document.',
+  },
+  {
+    target: '[data-tutorial="doc-generate"]',
+    title: 'Draft a document',
+    body: 'When FounderLex recommends a document, a card appears right here. Generating it shows a full preview — nothing downloads until you choose to.',
+  },
+  {
+    target: '[data-tutorial="progress-dashboard"]',
+    title: 'Your progress',
+    body: 'Track your founding steps, how many documents you’ve drafted, and exactly what’s next — all at a glance.',
+  },
+  {
+    target: '[data-tutorial="clear-conversation"]',
+    title: 'Start fresh anytime',
+    body: 'Once you’ve chatted, a "Clear conversation" link appears here — it resets your messages, progress, and drafted documents.',
+  },
+]
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function Home() {
@@ -1000,6 +1054,21 @@ export default function Home() {
   const [isExitingAbout, setIsExitingAbout] = useState(false)
   const [showConsent, setShowConsent]     = useState(false)
   const [consentGiven, setConsentGiven]   = useState(false)
+  const [showTutorialPrompt, setShowTutorialPrompt] = useState(false)
+  // null = not running. In-memory only, same as consentGiven above — resets
+  // on a real page reload, which is what "never re-triggers once dismissed
+  // for the session" means here, consistent with how consent itself works.
+  const [tutorialStep, setTutorialStep]   = useState<number | null>(null)
+
+  // Leaving chat (e.g. the header "Back" link) keeps the chat scene mounted
+  // at opacity 0 for the cross-fade — without this, the tour would keep
+  // highlighting those now-hidden elements over the About/Door screens.
+  useEffect(() => {
+    if (act !== 'chat') {
+      setShowTutorialPrompt(false)
+      setTutorialStep(null)
+    }
+  }, [act])
 
   const HANDOFF_MS = 480
 
@@ -1460,12 +1529,38 @@ export default function Home() {
     setShowConsent(false)
     setConsentGiven(true)
     setAct('chat')
+    // Offered exactly once per session, right after the one-time consent
+    // accept — there's no other place that ever sets this true, so
+    // dismissing it (skip or finish) means it never comes back this session.
+    setShowTutorialPrompt(true)
   }, [])
 
   const handleConsentDisagree = useCallback(() => {
     setShowConsent(false)
     if (act === 'about') handleBackToDoor()
   }, [act, handleBackToDoor])
+
+  const handleTutorialStart = useCallback(() => {
+    setShowTutorialPrompt(false)
+    setTutorialStep(0)
+  }, [])
+
+  const handleTutorialSkip = useCallback(() => {
+    setShowTutorialPrompt(false)
+    setTutorialStep(null)
+  }, [])
+
+  const handleTutorialNext = useCallback(() => {
+    setTutorialStep(i => {
+      if (i === null) return null
+      if (i >= TUTORIAL_STEPS.length - 1) return null
+      return i + 1
+    })
+  }, [])
+
+  const handleTutorialBack = useCallback(() => {
+    setTutorialStep(i => (i === null || i <= 0 ? i : i - 1))
+  }, [])
 
   const doorEnterHandoff = doorBusy && act === 'about' && !isExitingAbout
   const doorExitAnim = doorBusy && isExitingAbout
@@ -1818,7 +1913,7 @@ export default function Home() {
                     Founder<span style={{ color: RED }}>Lex</span>
                   </span>
                 </div>
-                <div className="chat-header-actions">
+                <div className="chat-header-actions" data-tutorial="clear-conversation">
                   {!isWide && previewPanelOpen && (
                     <button
                       type="button"
@@ -1848,7 +1943,7 @@ export default function Home() {
                 </div>
               </div>
 
-              <div ref={scrollRef} className="chat-messages">
+              <div ref={scrollRef} className="chat-messages" data-tutorial="doc-generate">
                 <div className="chat-turn chat-turn--bot">
                   <DoorGlyph w={28} h={31} panelTop={10} outerR={14} innerR={6} />
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: '100%' }}>
@@ -1977,7 +2072,7 @@ export default function Home() {
               </div>
 
               <div className="chat-input-area">
-                <div className="chat-input-bar">
+                <div className="chat-input-bar" data-tutorial="chat-input">
                   <input
                     value={draft}
                     onChange={e => setDraft(e.target.value)}
@@ -2066,6 +2161,23 @@ export default function Home() {
         <ConsentGate
           onAgree={handleConsentAgree}
           onDisagree={handleConsentDisagree}
+        />
+      )}
+
+      {/* Tour only offered where the persistent left rail exists — mobile's
+          drawer-based layout would need its own set of targets, out of
+          scope for this pass. */}
+      {showTutorialPrompt && isWide && act === 'chat' && (
+        <TutorialPrompt onStart={handleTutorialStart} onSkip={handleTutorialSkip} />
+      )}
+
+      {tutorialStep !== null && isWide && act === 'chat' && (
+        <TutorialTour
+          steps={TUTORIAL_STEPS}
+          currentStep={tutorialStep}
+          onNext={handleTutorialNext}
+          onBack={handleTutorialBack}
+          onSkip={handleTutorialSkip}
         />
       )}
 
