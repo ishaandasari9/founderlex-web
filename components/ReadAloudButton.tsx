@@ -16,8 +16,8 @@ function useIsSupported(check: () => boolean): boolean {
 }
 
 export default function ReadAloudButton({
-  text, label = 'Read aloud',
-}: { text: string; label?: string }) {
+  text, label = 'Read aloud', iconOnly = false, className,
+}: { text: string; label?: string; iconOnly?: boolean; className?: string }) {
   const supported = useIsSupported(isSpeechSupported)
   const idRef = useRef<symbol | null>(null)
   const [speakingNow, setSpeakingNow] = useState(false)
@@ -47,26 +47,33 @@ export default function ReadAloudButton({
   return (
     <button
       type="button"
+      className={className}
       onClick={handleClick}
       aria-pressed={speakingNow}
       aria-label={speakingNow ? 'Stop reading aloud' : label}
+      title={iconOnly ? (speakingNow ? 'Stop reading aloud' : label) : undefined}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: 6,
-        fontFamily: 'var(--font-mono), monospace',
-        fontSize: 10,
-        letterSpacing: '0.10em',
-        textTransform: 'uppercase',
+        justifyContent: 'center',
+        gap: iconOnly ? 0 : 6,
+        width: iconOnly ? 28 : undefined,
+        height: iconOnly ? 28 : undefined,
+        borderRadius: iconOnly ? 8 : undefined,
+        fontFamily: iconOnly ? undefined : 'var(--font-mono), monospace',
+        fontSize: iconOnly ? undefined : 10,
+        letterSpacing: iconOnly ? undefined : '0.10em',
+        textTransform: iconOnly ? undefined : 'uppercase',
         color: speakingNow ? RED : FAINT,
-        background: 'none',
-        border: 'none',
+        background: iconOnly ? (speakingNow ? 'rgba(219,26,26,0.08)' : 'rgba(42,36,32,0.05)') : 'none',
+        border: iconOnly ? '1px solid rgba(42,36,32,0.10)' : 'none',
         cursor: 'pointer',
-        padding: 0,
+        padding: iconOnly ? 0 : 0,
+        flexShrink: 0,
       }}
     >
-      {speakingNow ? <Square size={11} strokeWidth={2} aria-hidden /> : <Volume2 size={12} strokeWidth={1.8} aria-hidden />}
-      {speakingNow ? 'Stop' : label}
+      {speakingNow ? <Square size={iconOnly ? 13 : 11} strokeWidth={2} aria-hidden /> : <Volume2 size={iconOnly ? 14 : 12} strokeWidth={1.8} aria-hidden />}
+      {!iconOnly && (speakingNow ? 'Stop' : label)}
     </button>
   )
 }

@@ -1,11 +1,14 @@
 'use client'
 
-import React, { useState, useRef, useEffect, useCallback, Suspense } from 'react'
+import React, { useState, useRef, useEffect, useCallback, Suspense, useSyncExternalStore, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import {
   ArrowRight, ArrowLeft, ArrowUp,
   MessageSquareText, BookOpen, FileText, ShieldCheck, Download, ShieldAlert, Lock,
+  Map as MapIcon, Calendar, DollarSign, GitCompare, Search, Package, Mail, PanelLeft, PanelRight,
+  ChevronLeft, ChevronRight, X, Check, Circle, CircleDot,
 } from 'lucide-react'
+import { marked } from 'marked'
 import { validateProfile, emptyProfile, type FounderProfile } from '@/lib/founderProfile'
 import type { ConfirmField } from '@/lib/confirmationFields'
 import { buildLawyerReviewEmail, type GeneratedDoc } from '@/lib/lawyerReviewEmail'
@@ -30,7 +33,6 @@ import { TEMPLATE_LABELS, detectTemplates, resolveRecommendedTemplates } from '@
 // ── React Bits — SSR disabled (motion/react needs window) ────────────────────
 // Cast to any to bypass TypeScript inference quirks from .jsx component files
 const BorderGlow = dynamic(() => import('../components/BorderGlow'), { ssr: false }) as React.ComponentType<any>
-const TiltedCard  = dynamic(() => import('../components/TiltedCard'),  { ssr: false }) as React.ComponentType<any>
 const Counter     = dynamic(() => import('../components/Counter'),      { ssr: false }) as React.ComponentType<any>
 const GlassCard   = dynamic(() => import('../components/about/GlassCard'), { ssr: false }) as React.ComponentType<{
   children: React.ReactNode
@@ -66,7 +68,7 @@ const DoorHero    = dynamic(() => import('../components/door/DoorHero'), {
 // ── Types ────────────────────────────────────────────────────────────────────
 type Act = 'door' | 'about' | 'chat'
 interface Msg {
-  role: 'user' | 'bot' | 'doc-card' | 'checklist-card' | 'redflag-card'
+  role: 'user' | 'bot' | 'doc-card' | 'doc-artifact' | 'checklist-card' | 'redflag-card'
   text: string
   template?: string
   filled?: string
@@ -106,10 +108,20 @@ function downloadBase64(b64: string, name: string, mime: string) {
   URL.revokeObjectURL(url)
 }
 
+type GenerateResult = {
+  ok: boolean
+  error?: string
+  filled?: string
+  docx_b64?: string
+  docx_name?: string
+  pdf_b64?: string
+  pdf_name?: string
+}
+
 async function generateAndDownload(
   templateName: string,
   profile: FounderProfile | null
-): Promise<{ ok: boolean; error?: string; filled?: string }> {
+): Promise<GenerateResult> {
   try {
     const res = await fetch('/api/generate', {
       method: 'POST',
@@ -121,10 +133,25 @@ async function generateAndDownload(
 
     if (data.pdf_b64)  downloadBase64(data.pdf_b64,  data.pdf_name  || 'document.pdf',  'application/pdf')
     if (data.docx_b64) downloadBase64(data.docx_b64, data.docx_name || 'document.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
-    return { ok: true, filled: data.filled }
+    return {
+      ok: true,
+      filled: data.filled,
+      docx_b64: data.docx_b64,
+      docx_name: data.docx_name,
+      pdf_b64: data.pdf_b64,
+      pdf_name: data.pdf_name,
+    }
   } catch (e: unknown) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
   }
+}
+
+// Session docs carry download payloads for instant re-download in the preview panel.
+type SessionGeneratedDoc = GeneratedDoc & {
+  docx_b64?: string
+  docx_name?: string
+  pdf_b64?: string
+  pdf_name?: string
 }
 
 // B2 Founder Pack: same fetch-and-download shape as generateAndDownload
@@ -256,6 +283,31 @@ function SendButton({ onClick, disabled }: { onClick: () => void; disabled?: boo
   )
 }
 
+// ── Markdown helpers ──────────────────────────────────────────────────────────
+function renderMarkdown(html: string): string {
+  return marked.parse(html, { async: false }) as string
+}
+
+function markdownExcerpt(md: string, maxLen = 320): string {
+  const plain = md
+    .replace(/\[TO BE COMPLETED:?[^\]]*\]/g, '[blank]')
+    .replace(/[#>*_`[\]()]/g, '')
+    .replace(/\n+/g, ' ')
+    .trim()
+  return plain.length > maxLen ? `${plain.slice(0, maxLen)}…` : plain
+}
+
+// ── Bot message with markdown rendering ───────────────────────────────────────
+function BotMessageBubble({ text }: { text: string }) {
+  const html = useMemo(() => renderMarkdown(text), [text])
+  return (
+    <div
+      className="chat-bubble chat-bubble--bot chat-bubble--markdown"
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  )
+}
+
 // ── Back link (chat header, inline) ──────────────────────────────────────────
 function BackChatLink({ onClick }: { onClick: () => void }) {
   const [hov, setHov] = useState(false)
@@ -271,64 +323,144 @@ function BackChatLink({ onClick }: { onClick: () => void }) {
   )
 }
 
-// ── Document card (TiltedCard wrapper) ───────────────────────────────────────
+// ── Document card — chat-first draft CTA ────────────────────────────────────
 function DocCard({
-  template, onGenerate, generating,
-}: { template: string; onGenerate: () => void; generating: boolean }) {
+  template, onGenerate, generating, alreadyGenerated = false, quantitySelected = false,
+}: {
+  template: string
+  onGenerate: () => void
+  generating: boolean
+  alreadyGenerated?: boolean
+  quantitySelected?: boolean
+}) {
   const label = TEMPLATE_LABELS[template] ?? template
 
-  const overlay = (
-    <div style={{
-      width: '100%', height: '100%', borderRadius: 14,
-      background: WHITE, border: `1px solid rgba(42,36,32,0.12)`,
-      boxShadow: '0 8px 32px -12px rgba(42,36,32,0.3)',
-      padding: '18px 20px',
-      display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
-    }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <span style={{ width: 36, height: 36, borderRadius: 10, background: TILE, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <FileText size={18} color={RED} strokeWidth={1.6} />
-        </span>
-        <span style={{ fontFamily: BRICOLAGE, fontWeight: 600, fontSize: 15, color: INK, lineHeight: 1.25 }}>{label}</span>
-        <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: FAINT }}>PDF + Word</span>
+  return (
+    <div className="chat-doc-offer">
+      <div className="chat-doc-offer__header">
+        <span className="chat-doc-offer__icon"><FileText size={18} color={RED} strokeWidth={1.6} /></span>
+        <div>
+          <span className="chat-doc-offer__eyebrow">Draft in chat</span>
+          <h4 className="chat-doc-offer__title">{label}</h4>
+        </div>
       </div>
-      <button onClick={generating ? undefined : onGenerate} disabled={generating}
-        style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-          background: generating ? TILE : RED, color: generating ? MUTED : CREAM,
-          border: 'none', borderRadius: 9, padding: '9px 14px',
-          fontFamily: BRICOLAGE, fontWeight: 600, fontSize: 13, cursor: generating ? 'wait' : 'pointer',
-          transition: 'background .15s ease',
-        }}>
+      <p className="chat-doc-offer__desc">
+        {alreadyGenerated
+          ? 'This document is already drafted — scroll down to read the full version in the chat.'
+          : quantitySelected
+            ? 'Confirm your details on the next screen, then your draft will appear right here in the chat.'
+            : 'Choose one or three documents above, then continue here.'}
+      </p>
+      <button
+        type="button"
+        className="chat-doc-offer__btn"
+        onClick={generating ? undefined : onGenerate}
+        disabled={generating || (!alreadyGenerated && !quantitySelected)}
+      >
         {generating ? (
-          <>
-            <span className="loading-dot" /><span className="loading-dot" /><span className="loading-dot" />
-          </>
+          <><span className="loading-dot" /><span className="loading-dot" /><span className="loading-dot" /></>
+        ) : alreadyGenerated ? (
+          <><FileText size={14} strokeWidth={2} /> View in chat</>
         ) : (
-          <><Download size={13} strokeWidth={2} /> Generate &amp; Download</>
+          <><Download size={14} strokeWidth={2} /> Review &amp; generate</>
         )}
       </button>
     </div>
   )
+}
 
+function DraftQuantityPicker({
+  template, selected, onSelect,
+}: {
+  template: string
+  selected: 1 | 3 | null
+  onSelect: (q: 1 | 3) => void
+}) {
+  const label = TEMPLATE_LABELS[template] ?? template
   return (
-    <div className="doc-card-wrap" style={{ flexShrink: 0 }}>
-      <Suspense fallback={
-        <div style={{ width: 220, height: 160, borderRadius: 14, background: WHITE, border: `1px solid rgba(42,36,32,0.10)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <span style={{ fontFamily: MONO, fontSize: 11, color: FAINT }}>Loading…</span>
+    <div className="chat-draft-quantity">
+      <p className="chat-draft-quantity__prompt">
+        Before we fill in the form, how many documents would you like to draft?
+      </p>
+      <div className="chat-draft-quantity__options">
+        <button
+          type="button"
+          className={`chat-draft-quantity__option${selected === 1 ? ' chat-draft-quantity__option--active' : ''}`}
+          onClick={() => onSelect(1)}
+        >
+          <span className="chat-draft-quantity__option-label">One document</span>
+          <span className="chat-draft-quantity__option-desc">
+            Draft <strong>{label}</strong> only — the full preview stays right here in the chat.
+          </span>
+        </button>
+        <button
+          type="button"
+          className={`chat-draft-quantity__option${selected === 3 ? ' chat-draft-quantity__option--active' : ''}`}
+          onClick={() => onSelect(3)}
+        >
+          <span className="chat-draft-quantity__option-label">Three documents</span>
+          <span className="chat-draft-quantity__option-desc">
+            Bundle up to 3 recommended starter docs — opens the side preview panel for each.
+          </span>
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function ChatDocumentArtifact({
+  doc, onOpenPreview, inlineFull = false,
+}: {
+  doc: SessionGeneratedDoc
+  onOpenPreview?: () => void
+  inlineFull?: boolean
+}) {
+  const excerpt = markdownExcerpt(doc.filled)
+  const fullHtml = useMemo(() => renderMarkdown(doc.filled), [doc.filled])
+  return (
+    <div className="chat-artifact">
+      <div className="chat-artifact__header chat-artifact__header--static">
+        <span className="chat-artifact__icon"><FileText size={16} color={RED} strokeWidth={1.6} /></span>
+        <div className="chat-artifact__meta">
+          <span className="chat-artifact__label">Generated document</span>
+          <span className="chat-artifact__title">{doc.label}</span>
         </div>
-      }>
-        <TiltedCard
-          imageSrc="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='160'%3E%3Crect width='220' height='160' fill='%23ffffff' rx='14'/%3E%3C/svg%3E"
-          containerHeight="160px"
-          imageHeight="160px"
-          imageWidth="220px"
-          rotateAmplitude={6}
-          scaleOnHover={1.04}
-          displayOverlayContent
-          overlayContent={overlay}
-        />
-      </Suspense>
+      </div>
+      <div className="chat-artifact__paper">
+        {inlineFull ? (
+          <div
+            className="chat-artifact__markdown chat-doc-preview__markdown"
+            dangerouslySetInnerHTML={{ __html: fullHtml }}
+          />
+        ) : (
+          <p className="chat-artifact__excerpt">{excerpt}</p>
+        )}
+      </div>
+      <div className="chat-artifact__actions">
+        {!inlineFull && onOpenPreview && (
+          <button type="button" className="chat-artifact__link" onClick={onOpenPreview}>
+            Open in side panel
+          </button>
+        )}
+        {doc.docx_b64 && (
+          <button
+            type="button"
+            className="chat-artifact__link"
+            onClick={() => downloadBase64(doc.docx_b64!, doc.docx_name || 'document.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')}
+          >
+            Word
+          </button>
+        )}
+        {doc.pdf_b64 && (
+          <button
+            type="button"
+            className="chat-artifact__link"
+            onClick={() => downloadBase64(doc.pdf_b64!, doc.pdf_name || 'document.pdf', 'application/pdf')}
+          >
+            PDF
+          </button>
+        )}
+      </div>
     </div>
   )
 }
@@ -365,19 +497,361 @@ function buildEffectiveProfile(base: FounderProfile | null, panel: ProfileEditab
 // ── Loading bubble ────────────────────────────────────────────────────────────
 function LoadingBubble() {
   return (
-    <div style={{ display: 'flex', gap: 11, alignItems: 'flex-start', maxWidth: '90%' }}>
+    <div className="chat-turn chat-turn--bot">
       <DoorGlyph w={28} h={31} panelTop={10} outerR={14} innerR={6} />
-      <div style={{
-        background: TILE, color: INK,
-        padding: '18px 22px',
-        borderRadius: '4px 16px 16px 16px',
-        display: 'flex', alignItems: 'center', gap: 6,
-      }}>
+      <div className="chat-bubble chat-bubble--bot chat-bubble--loading">
         <span className="loading-dot" />
         <span className="loading-dot" />
         <span className="loading-dot" />
       </div>
     </div>
+  )
+}
+
+// ── Responsive breakpoint hook ────────────────────────────────────────────────
+function useMediaQuery(query: string): boolean {
+  const subscribe = useCallback((cb: () => void) => {
+    const mql = window.matchMedia(query)
+    mql.addEventListener('change', cb)
+    return () => mql.removeEventListener('change', cb)
+  }, [query])
+  return useSyncExternalStore(subscribe, () => window.matchMedia(query).matches, () => false)
+}
+
+type RoadmapStepStatus = 'done' | 'current' | 'upcoming' | 'ongoing'
+interface RoadmapStepBrief {
+  id: string
+  title: string
+  status: RoadmapStepStatus
+}
+
+interface RoadmapBrief {
+  headline: string
+  steps: RoadmapStepBrief[]
+}
+
+function RoadmapStepDot({ status }: { status: RoadmapStepStatus }) {
+  if (status === 'done') return <Check size={11} color="#3F9D6A" strokeWidth={2.5} aria-hidden />
+  if (status === 'current') return <CircleDot size={11} color={RED} strokeWidth={2.5} aria-hidden />
+  if (status === 'ongoing') return <Circle size={8} color={MUTED} strokeWidth={2} aria-hidden />
+  return <Circle size={8} color={FAINT} strokeWidth={2} fill={FAINT} aria-hidden />
+}
+
+function ProgressRail({
+  docCount, onOpenFull, onClose,
+}: { docCount: number; onOpenFull: () => void; onClose?: () => void }) {
+  const [roadmap, setRoadmap] = useState<RoadmapBrief | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    fetch('/api/roadmap')
+      .then(res => res.json())
+      .then(data => {
+        if (cancelled) return
+        if (data.roadmap) {
+          setRoadmap({
+            headline: data.roadmap.headline as string,
+            steps: (data.roadmap.steps as { id: string; title: string; status: RoadmapStepStatus }[]).slice(0, 5),
+          })
+        }
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [docCount])
+
+  return (
+    <div className="chat-rail-section chat-rail-section--progress">
+      <div className="chat-rail-section__head-row">
+        <button type="button" className="chat-rail-section__head" onClick={onOpenFull}>
+          <span className="chat-rail-section__title">Your progress</span>
+          <ChevronRight size={14} color={FAINT} strokeWidth={1.8} aria-hidden />
+        </button>
+        {onClose && (
+          <button type="button" className="chat-rail-section__close" onClick={onClose} aria-label="Hide progress">
+            <X size={14} strokeWidth={1.8} />
+          </button>
+        )}
+      </div>
+      {docCount > 0 && (
+        <div className="chat-rail-doc-count">
+          <Suspense fallback={<span style={{ fontFamily: BRICOLAGE, fontWeight: 700, fontSize: 22, color: RED }}>{docCount}</span>}>
+            <Counter value={docCount} fontSize={22} fontWeight="700" textColor={RED} gap={1} />
+          </Suspense>
+          <span>{docCount === 1 ? 'document drafted' : 'documents drafted'}</span>
+        </div>
+      )}
+      {loading && (
+        <p className="chat-rail-muted">Loading roadmap…</p>
+      )}
+      {!loading && roadmap && (
+        <>
+          <p className="chat-rail-headline">{roadmap.headline}</p>
+          <ul className="chat-rail-steps">
+            {roadmap.steps.filter(s => s.status !== 'ongoing').map(step => (
+              <li key={step.id} className={`chat-rail-step chat-rail-step--${step.status}`}>
+                <span className="chat-rail-step__icon"><RoadmapStepDot status={step.status} /></span>
+                <span className="chat-rail-step__label">{step.title}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  )
+}
+
+interface ChatToolItem {
+  id: string
+  label: string
+  action: string
+  desc: string
+  icon: React.ReactNode
+  run: () => void
+  disabled?: boolean
+}
+
+function ToolsNav({
+  tools, compact = false, onClose,
+}: { tools: ChatToolItem[]; compact?: boolean; onClose?: () => void }) {
+  return (
+    <nav className="chat-rail-section chat-rail-tools" aria-label="Optional tools">
+      {!compact && (
+        <>
+          <div className="chat-rail-section__head-row">
+            <span className="chat-rail-section__title chat-rail-section__title--static">Optional tools</span>
+            {onClose && (
+              <button type="button" className="chat-rail-section__close" onClick={onClose} aria-label="Hide optional tools">
+                <X size={14} strokeWidth={1.8} />
+              </button>
+            )}
+          </div>
+          <p className="chat-tools-intro">
+            Extra helpers that open in a panel. Document drafting always happens here in the chat — you don&apos;t need these to generate a doc.
+          </p>
+        </>
+      )}
+      <ul className="chat-tools-list">
+        {tools.map(t => (
+          <li key={t.id}>
+            <button
+              type="button"
+              className="chat-tool-btn"
+              disabled={t.disabled}
+              title={compact ? `${t.label}: ${t.desc}` : undefined}
+              aria-label={`${t.label}. ${t.action}. ${t.desc}`}
+              onClick={t.run}
+            >
+              <span className="chat-tool-btn__icon">{t.icon}</span>
+              {!compact && (
+                <span className="chat-tool-btn__text">
+                  <span className="chat-tool-btn__label">{t.label}</span>
+                  <span className="chat-tool-btn__action">{t.action}</span>
+                  <span className="chat-tool-btn__desc">{t.desc}</span>
+                </span>
+              )}
+              {compact && <span className="chat-tool-btn__compact-label">{t.label}</span>}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  )
+}
+
+function DownloadBtn({
+  label, onClick, disabled,
+}: { label: string; onClick: () => void; disabled?: boolean }) {
+  const [hov, setHov] = useState(false)
+  return (
+    <button
+      type="button"
+      className="chat-doc-download-btn"
+      disabled={disabled}
+      onClick={onClick}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        background: disabled ? TILE : hov ? '#C21717' : RED,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.5 : 1,
+      }}
+    >
+      <Download size={14} strokeWidth={2} aria-hidden />
+      {label}
+    </button>
+  )
+}
+
+function DocPreviewPanel({
+  docs, selectedTemplate, onSelectTemplate, onClose, inDrawer = false,
+}: {
+  docs: SessionGeneratedDoc[]
+  selectedTemplate: string | null
+  onSelectTemplate: (template: string) => void
+  onClose: () => void
+  inDrawer?: boolean
+}) {
+  const selected = docs.find(d => d.template === selectedTemplate) ?? docs[docs.length - 1] ?? null
+  const html = useMemo(
+    () => (selected?.filled ? renderMarkdown(selected.filled) : ''),
+    [selected?.filled],
+  )
+
+  if (docs.length === 0) {
+    return (
+      <div className={`chat-doc-preview ${inDrawer ? 'chat-doc-preview--drawer' : ''}`}>
+        <div className="chat-doc-preview__toolbar">
+          <span className="chat-doc-preview__eyebrow">Document preview</span>
+          <button type="button" className="chat-drawer-close" onClick={onClose} aria-label="Close document preview">
+            <X size={18} strokeWidth={1.8} />
+          </button>
+        </div>
+        <div className="chat-doc-preview-empty">
+          <FileText size={32} color={FAINT} strokeWidth={1.4} aria-hidden />
+          <p>No document yet</p>
+          <span>When you choose <strong>Three documents</strong>, drafts will appear here. Choose <strong>One document</strong> to keep everything in the chat.</span>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className={`chat-doc-preview ${inDrawer ? 'chat-doc-preview--drawer' : ''}`}>
+      <div className="chat-doc-preview__toolbar">
+        <div className="chat-doc-preview__toolbar-left">
+          <span className="chat-doc-preview__doc-icon"><FileText size={16} color={RED} strokeWidth={1.6} /></span>
+          <div>
+            <span className="chat-doc-preview__eyebrow">Preview</span>
+            {selected && <h3 className="chat-doc-preview__title">{selected.label}</h3>}
+          </div>
+        </div>
+        <div className="chat-doc-preview__toolbar-right">
+          <DownloadBtn
+            label="Word"
+            disabled={!selected?.docx_b64}
+            onClick={() => {
+              if (selected?.docx_b64) downloadBase64(selected.docx_b64, selected.docx_name || 'document.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+            }}
+          />
+          <DownloadBtn
+            label="PDF"
+            disabled={!selected?.pdf_b64}
+            onClick={() => {
+              if (selected?.pdf_b64) downloadBase64(selected.pdf_b64, selected.pdf_name || 'document.pdf', 'application/pdf')
+            }}
+          />
+          <button type="button" className="chat-drawer-close" onClick={onClose} aria-label="Close document preview">
+            <X size={18} strokeWidth={1.8} />
+          </button>
+        </div>
+      </div>
+      {docs.length > 1 && (
+        <div className="chat-doc-tabs" role="tablist">
+          {docs.map(d => (
+            <button
+              key={d.template}
+              type="button"
+              role="tab"
+              aria-selected={d.template === selected?.template}
+              className={`chat-doc-tab${d.template === selected?.template ? ' chat-doc-tab--active' : ''}`}
+              onClick={() => onSelectTemplate(d.template)}
+            >
+              {d.label}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="chat-doc-preview__canvas">
+        <div className="chat-doc-preview__paper">
+          {selected && (
+            <>
+              <div
+                className="chat-doc-preview__markdown"
+                dangerouslySetInnerHTML={{ __html: html }}
+              />
+              <details className="chat-doc-preview__checklist-details">
+                <summary>Before you sign checklist</summary>
+                <div className="chat-doc-preview__checklist">
+                  <BeforeYouSignChecklist
+                    template={selected.template}
+                    label={selected.label}
+                    filled={selected.filled}
+                  />
+                </div>
+              </details>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function LeftRail({
+  docCount, tools, expanded, onToggleExpand, onOpenRoadmap, compact,
+  progressOpen, toolsOpen, onCloseProgress, onCloseTools, onOpenProgress, onOpenTools,
+}: {
+  docCount: number
+  tools: ChatToolItem[]
+  expanded: boolean
+  onToggleExpand: () => void
+  onOpenRoadmap: () => void
+  compact: boolean
+  progressOpen: boolean
+  toolsOpen: boolean
+  onCloseProgress: () => void
+  onCloseTools: () => void
+  onOpenProgress: () => void
+  onOpenTools: () => void
+}) {
+  return (
+    <aside className={`chat-left-rail${compact ? ' chat-left-rail--compact' : ''}${!expanded && !compact ? ' chat-left-rail--collapsed' : ''}`}>
+      <div className="chat-left-rail__inner">
+        {!compact && (
+          <button
+            type="button"
+            className="chat-rail-toggle"
+            onClick={onToggleExpand}
+            aria-label={expanded ? 'Collapse sidebar' : 'Expand sidebar'}
+          >
+            {expanded ? <ChevronLeft size={16} strokeWidth={1.8} /> : <ChevronRight size={16} strokeWidth={1.8} />}
+          </button>
+        )}
+        {(expanded || compact) && (
+          <>
+            {!compact && progressOpen && (
+              <ProgressRail docCount={docCount} onOpenFull={onOpenRoadmap} onClose={onCloseProgress} />
+            )}
+            {!compact && !progressOpen && (
+              <button type="button" className="chat-rail-reopen" onClick={onOpenProgress}>
+                <MapIcon size={14} color={RED} strokeWidth={1.6} /> Your progress
+              </button>
+            )}
+            {toolsOpen && (
+              <ToolsNav tools={tools} compact={compact} onClose={compact ? undefined : onCloseTools} />
+            )}
+            {!compact && !toolsOpen && (
+              <button type="button" className="chat-rail-reopen" onClick={onOpenTools}>
+                <BookOpen size={14} color={RED} strokeWidth={1.6} /> Optional tools
+              </button>
+            )}
+          </>
+        )}
+        {!expanded && !compact && (
+          <>
+            {toolsOpen && <ToolsNav tools={tools} compact />}
+            {!toolsOpen && (
+              <button type="button" className="chat-rail-reopen chat-rail-reopen--icon" onClick={onOpenTools} title="Show optional tools">
+                <BookOpen size={16} color={RED} strokeWidth={1.6} />
+              </button>
+            )}
+          </>
+        )}
+      </div>
+    </aside>
   )
 }
 
@@ -391,7 +865,18 @@ export default function Home() {
   const [profile, setProfile]       = useState<FounderProfile | null>(null)
   const profileRef                  = useRef<FounderProfile | null>(null)
   const [docCount, setDocCount]     = useState(0)
-  const [generatedDocs, setGeneratedDocs] = useState<GeneratedDoc[]>([])
+  const [generatedDocs, setGeneratedDocs] = useState<SessionGeneratedDoc[]>([])
+  const [previewTemplate, setPreviewTemplate] = useState<string | null>(null)
+  const [previewPanelOpen, setPreviewPanelOpen] = useState(false)
+  const [sidePreviewEnabled, setSidePreviewEnabled] = useState(false)
+  const [leftRailExpanded, setLeftRailExpanded] = useState(true)
+  const [progressSectionOpen, setProgressSectionOpen] = useState(true)
+  const [toolsSectionOpen, setToolsSectionOpen] = useState(false)
+  const [showLeftDrawer, setShowLeftDrawer] = useState(false)
+  const [showPreviewDrawer, setShowPreviewDrawer] = useState(false)
+  const [draftQuantity, setDraftQuantity] = useState<1 | 3 | null>(null)
+  const [draftQuantityTemplate, setDraftQuantityTemplate] = useState<string | null>(null)
+  const activeDraftModeRef = useRef<'single' | 'triple'>('single')
   const [generatingTpl, setGeneratingTpl] = useState<string | null>(null)
   const [confirmPanel, setConfirmPanel]   = useState<ConfirmPanelState | null>(null)
   const [confirmGenerating, setConfirmGenerating] = useState(false)
@@ -405,7 +890,6 @@ export default function Home() {
   const [showCostEstimate, setShowCostEstimate] = useState(false)
   const [showCompare, setShowCompare] = useState(false)
   const [showRoadmap, setShowRoadmap] = useState(false)
-  const [showTools, setShowTools] = useState(false)
   const [enterSignal, setEnterSignal]     = useState(0)
   const [exitSignal, setExitSignal]       = useState(0)
   const [doorBusy, setDoorBusy]           = useState(false)
@@ -426,6 +910,11 @@ export default function Home() {
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [messages])
+
+  // Progress panel open by default when entering chat
+  useEffect(() => {
+    if (act === 'chat') setProgressSectionOpen(true)
+  }, [act])
 
   // Restore a saved session on first load
   useEffect(() => {
@@ -498,7 +987,13 @@ export default function Home() {
       // random and rushed.
       const mentionedTemplates = reply.includes('?') ? [] : detectTemplates(reply)
       if (mentionedTemplates.length >= 1 && mentionedTemplates.length <= 4) {
+        // One card + the draft-quantity chooser: "One document" drafts this
+        // template, "Three documents" bundles all recommended docs (Founder
+        // Pack). A multi-document recommendation is handled by that chooser, not
+        // by stacking a separate card per template.
         result.push({ role: 'doc-card', text: '', template: mentionedTemplates[0] })
+        setDraftQuantity(null)
+        setDraftQuantityTemplate(mentionedTemplates[0])
       }
 
       const flags = detectRedFlags(t)
@@ -548,6 +1043,69 @@ export default function Home() {
 
   const handleCancelConfirm = useCallback(() => setConfirmPanel(null), [])
 
+  const isWide = useMediaQuery('(min-width: 1280px)')
+  const isTablet = useMediaQuery('(min-width: 1024px) and (max-width: 1279px)')
+  const isMobile = useMediaQuery('(max-width: 1023px)')
+
+  const openDocPreview = useCallback((template: string) => {
+    setPreviewTemplate(template)
+    setPreviewPanelOpen(true)
+    if (isTablet || isMobile) setShowPreviewDrawer(true)
+  }, [isTablet, isMobile])
+
+  const closeDocPreview = useCallback(() => {
+    setPreviewPanelOpen(false)
+    setShowPreviewDrawer(false)
+  }, [])
+
+  const handleOpenTriplePack = useCallback(async (primaryTemplate: string) => {
+    const p = profileRef.current
+    let templateNames = resolveRecommendedTemplates(p ?? emptyProfile())
+    templateNames = [primaryTemplate, ...templateNames.filter(t => t !== primaryTemplate)].slice(0, 3)
+    if (templateNames.length === 0) templateNames = [primaryTemplate]
+    setPackLoadingFields(true)
+    try {
+      const results = await Promise.all(
+        templateNames.map(t => fetch(`/api/generate?template_name=${encodeURIComponent(t)}`).then(r => r.json())),
+      )
+      const fieldsByKey = new Map<string, ConfirmField>()
+      for (const r of results) {
+        if (r.error) continue
+        for (const f of (r.fields ?? []) as ConfirmField[]) fieldsByKey.set(f.key, f)
+      }
+      setPackConfirm({
+        templateNames,
+        fields: Array.from(fieldsByKey.values()),
+        companyName: p?.company_name || '',
+        state: p?.state || '',
+        structure: p?.structure || '',
+        description: p?.product_description || '',
+        founders: (p?.founders || []).map(f => ({ name: f.name, equity_pct: f.equity_pct })),
+      })
+    } catch (e: unknown) {
+      alert(`Could not load document fields: ${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      setPackLoadingFields(false)
+    }
+  }, [])
+
+  const handleStartDraft = useCallback(async (template: string) => {
+    if (!draftQuantity || draftQuantityTemplate !== template) return
+    activeDraftModeRef.current = draftQuantity === 1 ? 'single' : 'triple'
+    if (draftQuantity === 1) {
+      await handleOpenConfirm(template)
+    } else {
+      await handleOpenTriplePack(template)
+    }
+  }, [draftQuantity, draftQuantityTemplate, handleOpenConfirm, handleOpenTriplePack])
+
+  const handleSelectDraftQuantity = useCallback((template: string, q: 1 | 3) => {
+    setDraftQuantity(q)
+    setDraftQuantityTemplate(template)
+    activeDraftModeRef.current = q === 1 ? 'single' : 'triple'
+    if (q === 3) setSidePreviewEnabled(true)
+  }, [])
+
   const handleConfirmGenerate = useCallback(async () => {
     if (!confirmPanel) return
     setConfirmGenerating(true)
@@ -558,9 +1116,34 @@ export default function Home() {
       const label = TEMPLATE_LABELS[confirmPanel.template] ?? confirmPanel.template
       const filled = result.filled ?? ''
       setDocCount(prev => prev + 1)
-      setGeneratedDocs(prev => [...prev, { template: confirmPanel.template, label, filled }])
+      setGeneratedDocs(prev => [...prev, {
+        template: confirmPanel.template,
+        label,
+        filled,
+        docx_b64: result.docx_b64,
+        docx_name: result.docx_name,
+        pdf_b64: result.pdf_b64,
+        pdf_name: result.pdf_name,
+      }])
+      const singleMode = activeDraftModeRef.current === 'single'
+      if (singleMode) {
+        setSidePreviewEnabled(false)
+      } else {
+        setSidePreviewEnabled(true)
+        openDocPreview(confirmPanel.template)
+      }
       setMessages(prev => {
-        const next: Msg[] = [...prev, { role: 'checklist-card', text: '', template: confirmPanel.template, filled }]
+        const next: Msg[] = [
+          ...prev,
+          {
+            role: 'bot',
+            text: singleMode
+              ? `Your **${label}** is ready. Word and PDF copies are downloading now — the full draft is below in the chat.`
+              : `Your **${label}** is ready. Word and PDF copies are downloading now — review the draft below and in the preview panel.`,
+          },
+          { role: 'doc-artifact', text: singleMode ? 'inline' : '', template: confirmPanel.template, filled },
+          { role: 'checklist-card', text: '', template: confirmPanel.template, filled },
+        ]
         const flags = detectRedFlags(filled)
         if (flags.length > 0) next.push({ role: 'redflag-card', text: '', flags })
         persistSession(next, profileRef.current)
@@ -570,7 +1153,7 @@ export default function Home() {
     } else {
       alert(`Could not generate document: ${result.error ?? 'Unknown error'}`)
     }
-  }, [confirmPanel, persistSession])
+  }, [confirmPanel, persistSession, openDocPreview])
 
   // ── B2 Founder Pack: same confirm-then-generate gate as a single document
   // (README-v3 B2: "Keep the confirm-contents gate — a batch action
@@ -581,6 +1164,8 @@ export default function Home() {
   // fs, so this reuses the EXISTING GET /api/generate?template_name=X
   // endpoint once per resolved template, rather than adding a new one. ────
   const handleOpenFounderPack = useCallback(async () => {
+    activeDraftModeRef.current = 'triple'
+    setSidePreviewEnabled(true)
     const p = profileRef.current
     const templateNames = resolveRecommendedTemplates(p ?? emptyProfile())
     if (templateNames.length === 0) {
@@ -628,9 +1213,20 @@ export default function Home() {
           ...prev,
           ...result.docs!.map(d => ({ template: d.template_name, label: d.label, filled: d.filled })),
         ])
+        openDocPreview(result.docs[0].template_name)
+        setSidePreviewEnabled(true)
       }
       setMessages(prev => {
-        const next: Msg[] = [...prev, { role: 'bot', text: result.coverMemo ?? 'Your Founder Pack is ready and downloading now.' }]
+        const next: Msg[] = [
+          ...prev,
+          { role: 'bot', text: result.coverMemo ?? 'Your three-document pack is ready and downloading now. Open the preview panel to read each draft.' },
+          ...(result.docs ?? []).map(d => ({
+            role: 'doc-artifact' as const,
+            text: '',
+            template: d.template_name,
+            filled: d.filled,
+          })),
+        ]
         persistSession(next, profileRef.current)
         return next
       })
@@ -638,7 +1234,7 @@ export default function Home() {
     } else {
       alert(`Could not generate your Founder Pack: ${result.error ?? 'Unknown error'}`)
     }
-  }, [packConfirm, persistSession])
+  }, [packConfirm, persistSession, openDocPreview])
 
   const handleOpenLawyerEmail = useCallback(() => {
     setLawyerEmail(buildLawyerReviewEmail(profileRef.current ?? emptyProfile(), generatedDocs))
@@ -720,6 +1316,56 @@ export default function Home() {
       color,
     }))
   )
+
+  const chatTools: ChatToolItem[] = [
+    {
+      id: 'progress', label: 'Full roadmap', action: 'Opens a detailed progress panel',
+      desc: 'See every founding step with status, what it means, and suggested next actions.',
+      icon: <MapIcon size={16} color={RED} strokeWidth={1.6} />, run: () => setShowRoadmap(true),
+    },
+    {
+      id: 'deadlines', label: 'Filing deadlines', action: 'Opens a deadline reference panel',
+      desc: 'Typical filing windows and dates for your entity type — educational, not a calendar.',
+      icon: <Calendar size={16} color={RED} strokeWidth={1.6} />, run: () => setShowDeadlines(true),
+    },
+    {
+      id: 'cost', label: 'Cost & time', action: 'Opens a cost estimate panel',
+      desc: 'Rough fees and timelines for common steps like incorporation and trademark search.',
+      icon: <DollarSign size={16} color={RED} strokeWidth={1.6} />, run: () => setShowCostEstimate(true),
+    },
+    {
+      id: 'explain', label: 'Explain a document', action: 'Opens a paste-and-explain form',
+      desc: 'Paste any legal form you received and get a plain-English walkthrough of what it says.',
+      icon: <BookOpen size={16} color={RED} strokeWidth={1.6} />, run: () => setShowExplainForm(true),
+    },
+    {
+      id: 'compare', label: 'Compare documents', action: 'Opens a side-by-side compare tool',
+      desc: 'Upload or paste two versions of a contract to see what changed between them.',
+      icon: <GitCompare size={16} color={RED} strokeWidth={1.6} />, run: () => setShowCompare(true),
+    },
+    {
+      id: 'name', label: 'Check a name', action: 'Opens a name availability search',
+      desc: 'Search whether a business or nonprofit name may already be taken.',
+      icon: <Search size={16} color={RED} strokeWidth={1.6} />, run: () => setShowNameSearch(true),
+    },
+    {
+      id: 'pack', label: packLoadingFields ? 'Founder pack (loading…)' : 'Founder pack', action: 'Bundles all recommended docs',
+      desc: 'Download every document FounderLex recommended for you in one zip file.',
+      icon: <Package size={16} color={RED} strokeWidth={1.6} />, run: handleOpenFounderPack, disabled: packLoadingFields,
+    },
+    {
+      id: 'lawyer', label: 'Email a lawyer', action: generatedDocs.length > 0 ? 'Drafts a review-request email' : 'Unlocks after your first document',
+      desc: generatedDocs.length > 0
+        ? 'Pre-fills an email asking a lawyer to review the documents you drafted here.'
+        : 'Generate at least one document in the chat first.',
+      icon: <Mail size={16} color={RED} strokeWidth={1.6} />, run: handleOpenLawyerEmail, disabled: generatedDocs.length === 0,
+    },
+  ]
+
+  const showLeftRailDesktop = isWide || isTablet
+  const leftRailCompact = isTablet
+  const showPreviewFixed = isWide && previewPanelOpen
+  const showPreviewSlideOver = (isTablet || isMobile) && showPreviewDrawer
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100vh', minHeight: 600, overflow: 'hidden', background: CREAM, color: INK }}>
@@ -952,189 +1598,266 @@ export default function Home() {
       {/* ══════════════════════════════════════════════════════════════════
           ACT 3 — CHAT
       ══════════════════════════════════════════════════════════════════ */}
-      <section style={{
+      <section className="chat-workspace" style={{
         ...scene('chat', act === 'chat' ? 40 : 5),
-        background: CREAM, display: 'flex', flexDirection: 'column', alignItems: 'center',
+        background: CREAM,
       }}>
-        <div style={{ width: '100%', maxWidth: 760, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, padding: '0 clamp(14px,3vw,22px)' }}>
+        <div className={`chat-workspace-grid${isWide && !leftRailExpanded ? ' chat-workspace-grid--rail-collapsed' : ''}${!showPreviewFixed ? ' chat-workspace-grid--no-preview' : ''}`}>
+          {/* Left rail — desktop & tablet icon rail */}
+          {showLeftRailDesktop && (
+            <LeftRail
+              docCount={docCount}
+              tools={chatTools}
+              expanded={leftRailExpanded}
+              onToggleExpand={() => setLeftRailExpanded(v => !v)}
+              onOpenRoadmap={() => setShowRoadmap(true)}
+              compact={leftRailCompact}
+              progressOpen={progressSectionOpen}
+              toolsOpen={toolsSectionOpen}
+              onCloseProgress={() => setProgressSectionOpen(false)}
+              onCloseTools={() => setToolsSectionOpen(false)}
+              onOpenProgress={() => setProgressSectionOpen(true)}
+              onOpenTools={() => setToolsSectionOpen(true)}
+            />
+          )}
 
-          {/* Header */}
-          <div className="chat-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 4px', borderBottom: '1px solid rgba(42,36,32,0.10)', flexShrink: 0 }}>
-            <div className="chat-header-brand" style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-              <DoorGlyph w={16} h={18} panelTop={6} outerR={8} innerR={3} />
-              <span style={{ fontFamily: BRICOLAGE, fontWeight: 700, fontSize: 15, color: INK }}>
-                Founder<span style={{ color: RED }}>Lex</span>
-              </span>
-            </div>
-            <div className="chat-header-actions" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-              <span className="chat-header-status" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: MONO, fontSize: 10, letterSpacing: '0.10em', textTransform: 'uppercase', color: FAINT }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3F9D6A', flexShrink: 0 }} />
-                Here with you
-              </span>
-              {/* Tools menu — one entry point, each tool labeled + explained */}
-              <div style={{ position: 'relative' }}>
-                <button onClick={() => setShowTools(v => !v)}
-                  className="chat-clear-btn"
-                  aria-haspopup="menu" aria-expanded={showTools}
-                  style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 5,
-                    fontFamily: MONO, fontSize: 10, letterSpacing: '0.10em', textTransform: 'uppercase',
-                    color: RED, background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                  }}>
-                  Tool <span style={{ fontSize: 8, transform: showTools ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>▾</span>
-                </button>
-                {showTools && (() => {
-                  const TOOLS: { label: string; desc: string; run: () => void; disabled?: boolean; muted?: boolean }[] = [
-                    { label: 'Your progress', desc: "Where you are and what's left to do", run: () => setShowRoadmap(true) },
-                    { label: 'Filing deadlines', desc: 'Typical dates and windows to know about', run: () => setShowDeadlines(true) },
-                    { label: 'Cost & time', desc: 'Rough fees and how long each step takes', run: () => setShowCostEstimate(true) },
-                    { label: 'Explain a document', desc: 'Paste any legal form, get it in plain English', run: () => setShowExplainForm(true) },
-                    { label: 'Compare two documents', desc: "See what's different between two versions", run: () => setShowCompare(true) },
-                    { label: 'Check a name', desc: 'Search if a business or nonprofit name is taken', run: () => setShowNameSearch(true) },
-                    { label: packLoadingFields ? 'Founder pack (loading…)' : 'Founder pack', desc: 'Download all your documents in one bundle', run: handleOpenFounderPack, disabled: packLoadingFields },
-                    { label: 'Email a lawyer', desc: generatedDocs.length > 0 ? 'Draft a review request for the docs you made' : 'Available once you create a document', run: handleOpenLawyerEmail, disabled: generatedDocs.length === 0 },
-                  ]
-                  return (
-                    <>
-                      <div onClick={() => setShowTools(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
-                      <div role="menu" style={{
-                        position: 'absolute', top: 'calc(100% + 12px)', right: 0, zIndex: 50, width: 300,
-                        background: '#FFFDF9', border: '1px solid rgba(42,36,32,0.14)', borderRadius: 14,
-                        boxShadow: '0 14px 40px rgba(42,36,32,0.18)', padding: 7,
-                      }}>
-                        <div style={{ fontFamily: MONO, fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', color: FAINT, padding: '5px 9px 7px' }}>
-                          Optional tools
-                        </div>
-                        {TOOLS.map((t) => (
-                          <button key={t.label} role="menuitem" disabled={t.disabled}
-                            onClick={() => { setShowTools(false); t.run() }}
-                            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(219,26,26,0.06)' }}
-                            onMouseLeave={(e) => { e.currentTarget.style.background = 'none' }}
-                            style={{
-                              display: 'block', width: '100%', textAlign: 'left', background: 'none',
-                              border: 'none', borderRadius: 9, padding: '9px 10px',
-                              cursor: t.disabled ? 'default' : 'pointer', opacity: t.disabled ? 0.5 : 1,
-                            }}>
-                            <span style={{ display: 'block', fontFamily: BRICOLAGE, fontWeight: 600, fontSize: 13.5, color: INK }}>{t.label}</span>
-                            <span style={{ display: 'block', fontFamily: NEWSREADER, fontSize: 12, color: FAINT, marginTop: 2, lineHeight: 1.3 }}>{t.desc}</span>
-                          </button>
+          {/* Center — chat */}
+          <main className="chat-center">
+            <div className="chat-center-inner">
+              <div className="chat-header">
+                <div className="chat-header-brand">
+                  {isMobile && (
+                    <button type="button" className="chat-header-icon-btn" onClick={() => setShowLeftDrawer(true)} aria-label="Open tools">
+                      <PanelLeft size={18} strokeWidth={1.8} />
+                    </button>
+                  )}
+                  <DoorGlyph w={16} h={18} panelTop={6} outerR={8} innerR={3} />
+                  <span style={{ fontFamily: BRICOLAGE, fontWeight: 700, fontSize: 15, color: INK }}>
+                    Founder<span style={{ color: RED }}>Lex</span>
+                  </span>
+                </div>
+                <div className="chat-header-actions">
+                  {!isWide && previewPanelOpen && (
+                    <button
+                      type="button"
+                      className="chat-header-icon-btn"
+                      onClick={() => setShowPreviewDrawer(v => !v)}
+                      aria-label="Toggle document preview"
+                    >
+                      <PanelRight size={18} strokeWidth={1.8} />
+                    </button>
+                  )}
+                  {sidePreviewEnabled && generatedDocs.length > 0 && !previewPanelOpen && (
+                    <button
+                      type="button"
+                      className="chat-header-icon-btn"
+                      onClick={() => openDocPreview(generatedDocs[generatedDocs.length - 1].template)}
+                      aria-label="Open document preview"
+                    >
+                      <PanelRight size={18} strokeWidth={1.8} />
+                    </button>
+                  )}
+                  {messages.length > 0 && (
+                    <button onClick={handleClearSession} className="chat-clear-btn" type="button">
+                      Clear conversation
+                    </button>
+                  )}
+                  <BackChatLink onClick={() => setAct('about')} />
+                </div>
+              </div>
+
+              <div ref={scrollRef} className="chat-messages">
+                <div className="chat-turn chat-turn--bot">
+                  <DoorGlyph w={28} h={31} panelTop={10} outerR={14} innerR={6} />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: '100%' }}>
+                    <div className="chat-bubble chat-bubble--bot">
+                      Hi, I&apos;m FounderLex. Tell me what you&apos;re building. I&apos;ll explain the legal basics in plain English, help you figure out which documents you need, and draft them with your details. <span style={{ color: MUTED }}>No legal background needed.</span>
+                    </div>
+                    {messages.length === 0 && !isLoading && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                        {["Splitting equity with a co-founder", "Hiring my first contractor", "Do I need an NDA?", "Starting a nonprofit"].map(chip => (
+                          <Chip key={chip} label={chip} onSelect={sendMessage} />
                         ))}
                       </div>
-                    </>
+                    )}
+                  </div>
+                </div>
+
+                {messages.map((m, i) => {
+                  if (m.role === 'doc-card' && m.template) {
+                    const existing = generatedDocs.find(d => d.template === m.template)
+                    const quantityReady = draftQuantityTemplate === m.template && draftQuantity !== null
+                    return (
+                      <div key={i} className="chat-turn chat-turn--bot chat-turn--card">
+                        <DoorGlyph w={20} h={22} panelTop={7} outerR={10} innerR={4} />
+                        <div className="chat-doc-flow">
+                          {!existing && (
+                            <DraftQuantityPicker
+                              template={m.template}
+                              selected={draftQuantityTemplate === m.template ? draftQuantity : null}
+                              onSelect={q => handleSelectDraftQuantity(m.template!, q)}
+                            />
+                          )}
+                          <DocCard
+                            template={m.template}
+                            alreadyGenerated={!!existing}
+                            quantitySelected={quantityReady || !!existing}
+                            onGenerate={() => {
+                              if (existing) {
+                                document.getElementById(`doc-artifact-${m.template}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+                              } else {
+                                handleStartDraft(m.template!)
+                              }
+                            }}
+                            generating={generatingTpl === m.template || packLoadingFields}
+                          />
+                        </div>
+                      </div>
+                    )
+                  }
+                  if (m.role === 'doc-artifact' && m.template) {
+                    const stored = generatedDocs.find(d => d.template === m.template)
+                    const doc: SessionGeneratedDoc | null = stored ?? (m.filled ? {
+                      template: m.template,
+                      label: TEMPLATE_LABELS[m.template] ?? m.template,
+                      filled: m.filled,
+                    } : null)
+                    if (!doc) return null
+                    const inlineFull = m.text === 'inline'
+                    return (
+                      <div key={i} id={`doc-artifact-${m.template}`} className="chat-turn chat-turn--bot chat-turn--card">
+                        <DoorGlyph w={20} h={22} panelTop={7} outerR={10} innerR={4} />
+                        <ChatDocumentArtifact
+                          doc={doc}
+                          inlineFull={inlineFull}
+                          onOpenPreview={inlineFull ? undefined : () => openDocPreview(m.template!)}
+                        />
+                      </div>
+                    )
+                  }
+                  if (m.role === 'checklist-card' && m.template) {
+                    return (
+                      <div key={i} className="chat-turn chat-turn--bot chat-turn--card">
+                        <DoorGlyph w={20} h={22} panelTop={7} outerR={10} innerR={4} />
+                        <BeforeYouSignChecklist
+                          template={m.template}
+                          label={TEMPLATE_LABELS[m.template] ?? m.template}
+                          filled={m.filled ?? ''}
+                        />
+                      </div>
+                    )
+                  }
+                  if (m.role === 'redflag-card' && m.flags) {
+                    return (
+                      <div key={i} className="chat-turn chat-turn--bot chat-turn--card">
+                        <DoorGlyph w={20} h={22} panelTop={7} outerR={10} innerR={4} />
+                        <RedFlagCard flags={m.flags} />
+                      </div>
+                    )
+                  }
+                  if (m.isLoading) return <LoadingBubble key={i} />
+                  if (m.role === 'user') {
+                    return (
+                      <div key={i} className="chat-turn chat-turn--user">
+                        <div className="chat-bubble chat-bubble--user">{m.text}</div>
+                      </div>
+                    )
+                  }
+                  return (
+                    <div key={i} className="chat-turn chat-turn--bot">
+                      <DoorGlyph w={20} h={22} panelTop={7} outerR={10} innerR={4} />
+                      <div className="chat-bot-content">
+                        <BotMessageBubble text={m.text} />
+                        <div className="chat-bot-actions">
+                          <CitationChip citations={m.citations} />
+                          <ReadAloudButton text={m.text} iconOnly className="chat-read-aloud-btn" />
+                        </div>
+                      </div>
+                    </div>
                   )
-                })()}
+                })}
               </div>
-              {messages.length > 0 && (
-                <button onClick={handleClearSession}
-                  className="chat-clear-btn"
-                  style={{
-                    fontFamily: MONO, fontSize: 10, letterSpacing: '0.10em', textTransform: 'uppercase',
-                    color: FAINT, background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                  }}>
-                  Clear conversation
+
+              <div className="chat-input-area">
+                <div className="chat-input-bar">
+                  <input
+                    value={draft}
+                    onChange={e => setDraft(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(draft) } }}
+                    aria-label="Ask FounderLex a question"
+                    placeholder="Describe what you're building, or ask a legal-basics question…"
+                    disabled={isLoading}
+                  />
+                  <MicButton value={draft} onChange={setDraft} disabled={isLoading} />
+                  <SendButton onClick={() => sendMessage(draft)} disabled={isLoading || !draft.trim()} />
+                </div>
+                <p className="chat-input-disclaimer">
+                  <ShieldCheck size={12} color={FAINT} strokeWidth={1.6} aria-hidden />
+                  Educational, not legal advice. Session saved anonymously — clear anytime.
+                </p>
+              </div>
+            </div>
+          </main>
+
+          {/* Right — document preview (desktop) */}
+          {showPreviewFixed && (
+            <DocPreviewPanel
+              docs={generatedDocs}
+              selectedTemplate={previewTemplate}
+              onSelectTemplate={setPreviewTemplate}
+              onClose={closeDocPreview}
+            />
+          )}
+        </div>
+
+        {/* Mobile left drawer */}
+        {isMobile && showLeftDrawer && (
+          <>
+            <div className="chat-drawer-backdrop" onClick={() => setShowLeftDrawer(false)} />
+            <div className="chat-drawer chat-drawer--left">
+              <div className="chat-drawer__header">
+                <span>Sidebar</span>
+                <button type="button" className="chat-drawer-close" onClick={() => setShowLeftDrawer(false)} aria-label="Close sidebar">
+                  <X size={18} strokeWidth={1.8} />
+                </button>
+              </div>
+              {progressSectionOpen ? (
+                <ProgressRail
+                  docCount={docCount}
+                  onOpenFull={() => { setShowLeftDrawer(false); setShowRoadmap(true) }}
+                  onClose={() => setProgressSectionOpen(false)}
+                />
+              ) : (
+                <button type="button" className="chat-rail-reopen" onClick={() => setProgressSectionOpen(true)}>
+                  <MapIcon size={14} color={RED} strokeWidth={1.6} /> Your progress
                 </button>
               )}
-              <BackChatLink onClick={() => setAct('about')} />
+              {toolsSectionOpen ? (
+                <ToolsNav tools={chatTools} onClose={() => setToolsSectionOpen(false)} />
+              ) : (
+                <button type="button" className="chat-rail-reopen" onClick={() => setToolsSectionOpen(true)}>
+                  <BookOpen size={14} color={RED} strokeWidth={1.6} /> Optional tools
+                </button>
+              )}
             </div>
-          </div>
+          </>
+        )}
 
-          {/* Conversation */}
-          <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '26px 4px 16px', display: 'flex', flexDirection: 'column', gap: 18 }}>
-
-            {/* Greeting */}
-            <div style={{ display: 'flex', gap: 11, alignItems: 'flex-start', maxWidth: '90%' }}>
-              <DoorGlyph w={28} h={31} panelTop={10} outerR={14} innerR={6} />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div style={{ background: TILE, color: INK, padding: '15px 18px', borderRadius: '4px 16px 16px 16px', fontFamily: NEWSREADER, fontSize: 17, lineHeight: 1.55 }}>
-                  Hi, I&apos;m FounderLex. Tell me what you&apos;re building. I&apos;ll explain the legal basics in plain English, help you figure out which documents you need, and draft them with your details. <span style={{ color: MUTED }}>No legal background needed.</span>
-                </div>
-                {messages.length === 0 && !isLoading && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                    {["Splitting equity with a co-founder", "Hiring my first contractor", "Do I need an NDA?", "Starting a nonprofit"].map(chip => (
-                      <Chip key={chip} label={chip} onSelect={sendMessage} />
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Message history */}
-            {messages.map((m, i) => {
-              if (m.role === 'doc-card' && m.template) {
-                return (
-                  <div key={i} style={{ display: 'flex', paddingLeft: 39 }}>
-                    <DocCard
-                      template={m.template}
-                      onGenerate={() => handleOpenConfirm(m.template!)}
-                      generating={generatingTpl === m.template}
-                    />
-                  </div>
-                )
-              }
-              if (m.role === 'checklist-card' && m.template) {
-                return (
-                  <div key={i} style={{ display: 'flex', paddingLeft: 39 }}>
-                    <BeforeYouSignChecklist
-                      template={m.template}
-                      label={TEMPLATE_LABELS[m.template] ?? m.template}
-                      filled={m.filled ?? ''}
-                    />
-                  </div>
-                )
-              }
-              if (m.role === 'redflag-card' && m.flags) {
-                return (
-                  <div key={i} style={{ display: 'flex', paddingLeft: 39 }}>
-                    <RedFlagCard flags={m.flags} />
-                  </div>
-                )
-              }
-              if (m.isLoading) return <LoadingBubble key={i} />
-              return (
-                <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                  {m.role === 'bot' && <div style={{ marginRight: 11, flexShrink: 0, paddingTop: 4 }}><DoorGlyph w={20} h={22} panelTop={7} outerR={10} innerR={4} /></div>}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxWidth: '82%', alignItems: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                    <div style={{
-                      background: m.role === 'user' ? INK : TILE,
-                      color: m.role === 'user' ? CREAM : INK,
-                      padding: '14px 17px',
-                      borderRadius: m.role === 'user' ? '16px 16px 4px 16px' : '4px 16px 16px 16px',
-                      fontFamily: NEWSREADER, fontSize: 16.5, lineHeight: 1.55,
-                      whiteSpace: 'pre-wrap',
-                    }}>
-                      {m.text}
-                    </div>
-                    {m.role === 'bot' && <CitationChip citations={m.citations} />}
-                    {m.role === 'bot' && <ReadAloudButton text={m.text} />}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
-          {/* Input bar */}
-          <div style={{ padding: '8px 4px 20px', flexShrink: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: WHITE, border: '1px solid rgba(42,36,32,0.14)', borderRadius: 15, padding: '8px 8px 8px 17px', boxShadow: '0 14px 30px -22px rgba(42,36,32,0.5)' }}>
-              <input
-                value={draft}
-                onChange={e => setDraft(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(draft) } }}
-                aria-label="Ask FounderLex a question"
-                placeholder="Describe what you're building, or ask a legal-basics question…"
-                disabled={isLoading}
-                style={{ flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', fontFamily: NEWSREADER, fontSize: 16, color: INK }}
+        {/* Tablet / mobile preview slide-over */}
+        {showPreviewSlideOver && (
+          <>
+            <div className="chat-drawer-backdrop" onClick={() => setShowPreviewDrawer(false)} />
+            <div className="chat-drawer chat-drawer--right">
+              <DocPreviewPanel
+                docs={generatedDocs}
+                selectedTemplate={previewTemplate}
+                onSelectTemplate={setPreviewTemplate}
+                onClose={closeDocPreview}
+                inDrawer
               />
-              <MicButton value={draft} onChange={setDraft} disabled={isLoading} />
-              <SendButton onClick={() => sendMessage(draft)} disabled={isLoading || !draft.trim()} />
             </div>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7, marginTop: 10, paddingLeft: 4 }}>
-              <ShieldCheck size={12} color={FAINT} strokeWidth={1.6} style={{ marginTop: 2, flexShrink: 0 }} aria-hidden />
-              <span style={{ fontFamily: MONO, fontSize: 10.5, lineHeight: 1.6, color: FAINT }}>
-                Educational, not legal advice, and not a law firm. I&apos;ll point you to a real lawyer when it matters. Your session is saved anonymously (no login) so you can return later. Use <strong style={{ fontWeight: 500, color: MUTED }}>Clear conversation</strong> anytime.
-              </span>
-            </div>
-          </div>
-        </div>
+          </>
+        )}
       </section>
 
       {showConsent && (

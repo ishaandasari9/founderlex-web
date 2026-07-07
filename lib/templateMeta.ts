@@ -43,7 +43,7 @@ export const TEMPLATE_KEYWORDS: Record<string, string[]> = {
   sow_template: ['statement of work'],
   independent_contractor_consulting: ['independent contractor agreement'],
   nonprofit_articles: ['articles of incorporation', 'nonprofit articles'],
-  nonprofit_bylaws: ['nonprofit bylaws', 'nonprofit by-laws'],
+  nonprofit_bylaws: ['nonprofit bylaws', 'nonprofit by-laws', 'bylaws', 'by-laws'],
   nonprofit_conflict_of_interest: ['conflict of interest policy'],
   donation_acknowledgment_letter: ['donation acknowledgment letter', 'donation acknowledgement letter', 'donation receipt letter'],
 }
@@ -56,63 +56,47 @@ export function detectTemplate(text: string): string | null {
   return null
 }
 
-// Every distinct template the text recommends for the user's current situation,
-// in keyword-table order. Unlike detectTemplate (first match only and broad by
-// design), this is intentionally strict because the chat UI uses it to surface
-// Generate cards. A casual mention, topic menu, future hypothetical, correction,
-// or answer that is still asking a clarifying question must not become a form.
+// Every distinct template the reply recommends for the user's current
+// situation, in keyword-table order. Used by the chat UI to surface Generate
+// cards.
+//
+// Approach (rewritten after repeated live misses): the earlier version required
+// a recommendation VERB immediately beside each document name. The model's real
+// recommendation phrasings are far too varied for that — "X, Y and Z are your
+// three starting-point documents", "you need to start with ... : X, and Y",
+// "here's what you need: ..." — and each new phrasing silently produced NO card,
+// breaking the core flow. So detection is now inverted: a document name in a
+// non-question reply DOES surface a card, UNLESS the mention is negated, a future
+// hypothetical, a correction, or part of a "like / such as / any" topic list —
+// which is exactly what isNonRecommendationMention already encodes. Those guards
+// (not verb-adjacency) are what actually separate a real recommendation from a
+// casual mention, so leaning on them is both simpler and much more robust.
+//
+// Two coarse gates keep this from over-firing: (1) the whole reply must be a
+// non-question — a reply that is still asking a clarifying question is gathering
+// context, not recommending; (2) app/page.tsx only renders cards when 1–4
+// templates are detected, so a "here are all 15 documents we make" answer (>4)
+// surfaces nothing.
 export function detectTemplates(text: string): string[] {
   const lower = text.toLowerCase()
+  if (lower.includes('?')) return []
   const found: string[] = []
   for (const [template, keywords] of Object.entries(TEMPLATE_KEYWORDS)) {
-    if (keywords.some(kw => hasCurrentRecommendationMention(lower, kw))) found.push(template)
+    if (keywords.some((kw) => hasRecommendationMention(lower, kw))) found.push(template)
   }
   return found
 }
 
-function hasCurrentRecommendationMention(lowerText: string, keyword: string): boolean {
+// True if the keyword appears at least once as a genuine recommendation — i.e.
+// present in the text and NOT filtered out by isNonRecommendationMention
+// (negation / correction / future hypothetical / topic-list).
+function hasRecommendationMention(lowerText: string, keyword: string): boolean {
   let index = lowerText.indexOf(keyword)
   while (index !== -1) {
-    if (isCurrentRecommendationMention(lowerText, index, keyword.length)) return true
+    if (!isNonRecommendationMention(lowerText, index, keyword.length)) return true
     index = lowerText.indexOf(keyword, index + keyword.length)
   }
   return false
-}
-
-function isCurrentRecommendationMention(lowerText: string, index: number, length: number): boolean {
-  if (isNonRecommendationMention(lowerText, index, length)) return false
-
-  const sentence = getSentenceWindow(lowerText, index, length)
-  if (sentence.includes('?')) return false
-
-  const before = lowerText.slice(Math.max(0, index - 120), index)
-  const after = lowerText.slice(index + length, Math.min(lowerText.length, index + length + 120))
-  const window = `${before}__doc__${after}`
-
-  return [
-    /(?:you(?:'ll| will)?\s+(?:need|want)|you should|you can start with|start with|i(?:'d| would)? recommend|my recommendation is|the right document is|the main document is|the first document is|get|draft|prepare|use)\s+(?:a\s+|an\s+|the\s+)?__doc__/,
-    // Up to two intervening intensifier words are allowed between the article
-    // and the ranking word ("your SINGLE most important document", "the ABSOLUTE
-    // first thing", "your BY FAR best option"). Without this, a very common,
-    // clearly-recommending phrasing the model actually produces — "the Founders'
-    // Agreement is your single most important early document" — matched nothing,
-    // so no Generate card surfaced even though the reply told the user to click
-    // Generate on the card (found in live Chrome testing). Negations are still
-    // filtered first by isNonRecommendationMention, so this stays recommendation-only.
-    /__doc__\s+(?:is|are)\s+(?:your|the|a)\s+(?:\w+\s+){0,2}(?:right|main|first|next|most important|best|core|foundational)\b/,
-    /__doc__\s+(?:covers|locks in|protects|sets|governs|handles|fits)\b[^.?!]{0,80}\b(?:this|your|for you|situation|equity|scope|relationship|data|rules|board)/,
-    /(?:i|we|founderlex)\s+can\s+(?:draft|generate|prepare)\s+(?:a\s+|an\s+|the\s+)?__doc__/,
-  ].some(pattern => pattern.test(window))
-}
-
-function getSentenceWindow(lowerText: string, index: number, length: number): string {
-  const startCandidates = ['.', '!', '?', '\n'].map(mark => lowerText.lastIndexOf(mark, index - 1))
-  const start = Math.max(-1, ...startCandidates) + 1
-  const endCandidates = ['.', '!', '?', '\n']
-    .map(mark => lowerText.indexOf(mark, index + length))
-    .filter(pos => pos !== -1)
-  const end = endCandidates.length > 0 ? Math.min(...endCandidates) + 1 : lowerText.length
-  return lowerText.slice(start, end)
 }
 
 function isNonRecommendationMention(lowerText: string, index: number, length: number): boolean {

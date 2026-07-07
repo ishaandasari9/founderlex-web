@@ -51,7 +51,13 @@ export function parseVerifierVerdict(input: unknown): VerifierVerdict | null {
   }
 }
 
-const DEFAULT_VERIFIER_TIMEOUT_MS = 8000
+// Raised from 8s: over a slow/contended connection (e.g. conference wifi during
+// a live demo) a legitimate verifier call could take longer than 8s and get
+// killed, which used to surface the "I'm not fully confident" refusal on a
+// perfectly good answer. 15s lets slow-but-valid checks actually complete. If it
+// still times out, runVerifiedAnswer now treats that as a verifier OUTAGE (see
+// below), not a content objection.
+const DEFAULT_VERIFIER_TIMEOUT_MS = 15000
 
 // Wraps an arbitrary "call the verifier model" function with a timeout, a
 // catch-all for thrown/rejected errors, and shape validation — all three
@@ -87,6 +93,11 @@ export interface RunVerifiedAnswerResult {
   // True only if neither the initial draft nor the regenerated draft came
   // back clean (or regeneration itself failed) — the safe fallback was used.
   usedFallback: boolean
+  // True when the verifier was UNAVAILABLE on the first pass (timeout / network
+  // error / malformed response) and the initial draft was shown under the
+  // deterministic layer-4 backstop instead of being refused. Distinct from a
+  // genuine content flag; used only for observability.
+  verifierUnavailable?: boolean
 }
 
 // Pure orchestration of the A2 routing rule, decoupled from the live
@@ -105,13 +116,32 @@ export async function runVerifiedAnswer(params: {
   const { initialDraft, verify, regenerate, fallbackText } = params
 
   const verdict1 = await verify(initialDraft)
+
+  // Clean first pass → show it.
   if (verdict1 !== null && isCleanVerdict(verdict1)) {
     return { text: initialDraft, flagged: false, usedFallback: false }
   }
 
-  const issues = verdict1?.issues?.length
+  // Verifier UNAVAILABLE on the first pass. A null here means resolveVerdict
+  // could not get a verdict at all — a timeout, a network error, or a malformed
+  // response — NOT that the verifier looked at the answer and objected (a real
+  // objection returns a VerifierVerdict with isCleanVerdict === false, handled
+  // below). Punishing the user for an infrastructure blip by refusing a
+  // perfectly good answer is the wrong trade in a live product, so instead we
+  // show the initial draft and rely on the deterministic layer-4
+  // forbidden-assertion backstop that the caller (lib/chat.ts) always runs on
+  // the returned text. The out-of-scope guard already ran before drafting, so
+  // this path is still covered by two independent, non-LLM safety layers.
+  if (verdict1 === null) {
+    // eslint-disable-next-line no-console
+    console.log('[runtime-verifier]', { verifierUnavailable: true, shownUnderLayer4Backstop: true })
+    return { text: initialDraft, flagged: false, usedFallback: false, verifierUnavailable: true }
+  }
+
+  // Genuine content flag → regenerate once with the specific issues, re-verify.
+  const issues = verdict1.issues.length
     ? verdict1.issues
-    : ['The verifier could not confirm this answer was safe to show as written (no usable verdict returned).']
+    : ['The verifier flagged this answer but did not list a specific fixable issue.']
 
   let retryDraft: string
   try {
@@ -125,6 +155,11 @@ export async function runVerifiedAnswer(params: {
     return { text: retryDraft, flagged: true, usedFallback: false }
   }
 
+  // The retry is still flagged, OR the verifier went unavailable while checking
+  // the retry. Either way the ORIGINAL answer had a genuine content problem, so
+  // we do NOT trust an unverified regeneration of it — fail closed to the safe
+  // fallback. (The fail-open path above is only for a first-pass outage on an
+  // answer the verifier never objected to.)
   return { text: fallbackText, flagged: true, usedFallback: true }
 }
 

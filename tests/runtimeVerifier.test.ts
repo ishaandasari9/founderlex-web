@@ -151,22 +151,44 @@ async function main() {
     check(regenerateCallCount === 1, 'regeneration is attempted exactly once, never looped')
   }
 
-  // ── runVerifiedAnswer: the other required scenario — a verifier
-  // timeout/error (verify() returning null) falls back safely, the draft
-  // never leaks ─────────────────────────────────────────────────────────────
+  // ── runVerifiedAnswer: a FIRST-PASS verifier OUTAGE (verify() returning null
+  // — timeout/error/malformed, NOT a content objection) shows the initial draft
+  // under the deterministic layer-4 backstop instead of refusing. This is the
+  // demo-resilience change: an infrastructure blip must not nuke a good answer.
+  // regenerate() must never be called on this path. ────────────────────────────
   {
-    const BAD_OR_UNKNOWN_DRAFT = 'Some answer the verifier could not check because it kept timing out.'
+    const DRAFT = 'An LLC creates a legal wall between your business and your personal assets.'
+    let regenerateCalled = false
     const result = await runVerifiedAnswer({
-      initialDraft: BAD_OR_UNKNOWN_DRAFT,
-      verify: async () => null, // simulates resolveVerdict's fail-closed null from a timeout or error
-      regenerate: async () => 'a second draft, also unverifiable',
+      initialDraft: DRAFT,
+      verify: async () => null, // resolveVerdict's null from a timeout/error/malformed response
+      regenerate: async () => { regenerateCalled = true; return 'unused' },
       fallbackText: 'FALLBACK: verifier unavailable.',
     })
     check(
-      result.text !== BAD_OR_UNKNOWN_DRAFT && result.text !== 'a second draft, also unverifiable',
-      'REQUIRED: a verifier failure (null verdict) never leaks the draft, original or regenerated',
+      result.text === DRAFT && !result.usedFallback && result.verifierUnavailable === true && !result.flagged,
+      'RESILIENCE: a first-pass verifier outage shows the initial draft (layer-4 is the net), not the refusal',
     )
-    check(result.text === 'FALLBACK: verifier unavailable.' && result.usedFallback, 'a verifier failure falls back to the safe response')
+    check(!regenerateCalled, 'a first-pass verifier outage does not trigger a regeneration')
+  }
+
+  // ── runVerifiedAnswer: a GENUINE content flag whose retry then hits a
+  // verifier outage (null on the retry) still fails closed — we never trust an
+  // unverified regeneration of an answer that had a real content problem. This
+  // preserves fail-closed exactly where it matters. ────────────────────────────
+  {
+    const BAD_DRAFT = 'This is legally fine, go ahead and sign it.'
+    const result = await runVerifiedAnswer({
+      initialDraft: BAD_DRAFT,
+      verify: async (draft) => (draft === BAD_DRAFT ? flaggedOutOfScope(['contains a forbidden safety verdict']) : null),
+      regenerate: async () => 'a regenerated but now-unverifiable draft',
+      fallbackText: 'FALLBACK: could not confirm safe.',
+    })
+    check(
+      result.text !== BAD_DRAFT && result.text !== 'a regenerated but now-unverifiable draft',
+      'FAIL-CLOSED: a genuinely flagged answer whose retry cannot be verified never leaks either draft',
+    )
+    check(result.text === 'FALLBACK: could not confirm safe.' && result.usedFallback, 'a flagged-then-unverifiable retry falls back to the safe response')
   }
 
   // ── runVerifiedAnswer: regenerate() itself throwing also falls back ─────

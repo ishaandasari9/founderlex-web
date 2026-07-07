@@ -66,6 +66,24 @@ check(
   JSON.stringify(detectTemplates("The Mutual NDA is the absolute first thing you should set up before those conversations.")) === JSON.stringify(['mutual_nda']),
   'surfaces a card for "the absolute first thing" intensifier phrasing',
 )
+// Regression (live nonprofit flow): multi-document recommendations list the
+// docs after a cue ("the three documents you need: X, Y, Z"), which the
+// adjacency patterns missed entirely, so NO card surfaced and the user
+// couldn't generate anything.
+check(
+  JSON.stringify(detectTemplates("Perfect. I'm going to recommend the three documents you need to get started: Articles of Incorporation, Nonprofit Bylaws, and Conflict of Interest Policy. These are starter templates FounderLex will generate for you.")) === JSON.stringify(['nonprofit_articles', 'nonprofit_bylaws', 'nonprofit_conflict_of_interest']),
+  'surfaces a card for every doc in a list-style multi-document recommendation',
+)
+check(
+  JSON.stringify(detectTemplates("For getting started, you need three key documents: Articles of Incorporation, Bylaws, and a Conflict of Interest Policy. Would you like me to generate them?")) === '[]',
+  'does NOT surface cards while the list-style recommendation is still a question',
+)
+// Regression (second live nonprofit reply): "you need to start with ... : X, and
+// Y ... you'll also need Z", with "Bylaws" written bare (not "Nonprofit Bylaws").
+check(
+  JSON.stringify(detectTemplates("You need to start with two state-level documents before the IRS stuff comes in: Articles of Incorporation, which you file with your state, and Bylaws, which are your internal operating rules. Once those are in place, you'll also need a Conflict of Interest Policy because the IRS looks for that on the 501c3 application.")) === JSON.stringify(['nonprofit_articles', 'nonprofit_bylaws', 'nonprofit_conflict_of_interest']),
+  'surfaces all three cards for a bare-"Bylaws" nonprofit recommendation phrased as "you need ... you will also need"',
+)
 check(
   JSON.stringify(detectTemplates("Once your LLC is formed, we can also help you draft starter documents like Terms of Service and a Privacy Policy if you're collecting customer data, or a Founders' Agreement if you bring on co-founders later.")) === '[]',
   'does not surface a card for future hypothetical document mentions',
