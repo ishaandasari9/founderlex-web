@@ -1,7 +1,6 @@
 // Plain-English, jargon-free starter questions a first-time founder with no
-// idea how to "prompt" an AI can pick instead of facing a blank box. Single
-// shared source for both the empty-chat suggestion chips and the chat-input
-// autocomplete dropdown in app/page.tsx, so the two never drift apart.
+// idea how to "prompt" an AI can pick instead of facing a blank box. Backs
+// the empty-chat suggestion chips in app/page.tsx.
 //
 // Kept in its own zero-import file (not inline in app/page.tsx) so it can be
 // imported directly by a plain tsx test script without dragging in the

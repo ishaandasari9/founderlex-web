@@ -1,15 +1,13 @@
 // Regression test for STARTER_SUGGESTIONS (app/starterSuggestions.ts) — the
-// shared, jargon-free starter-question list used by both the empty-chat
-// Chip buttons and the chat-input autocomplete dropdown in app/page.tsx. A
-// total beginner with no idea how to "prompt" an AI relies on this list
-// instead of a blank box, so it must never be empty, duplicated, or drift
-// between the two call sites (they read the same array, so drift can't
-// happen at the code level, but this pins the list's shape so a careless
-// edit gets caught). Deliberately imported from its own zero-dependency
-// module rather than from app/page.tsx directly — that file is a 'use
-// client' page with a large Next/React/browser dependency graph
-// (dynamic(), lucide-react, marked, a dozen component modules) that has no
-// business being loaded just to read a string array in a plain tsx test.
+// jargon-free starter-question list backing the empty-chat Chip buttons in
+// app/page.tsx. A total beginner with no idea how to "prompt" an AI relies
+// on this list instead of a blank box, so it must never be empty,
+// duplicated, or drift from what the empty-chat screen actually shows.
+// Deliberately imported from its own zero-dependency module rather than
+// from app/page.tsx directly — that file is a 'use client' page with a
+// large Next/React/browser dependency graph (dynamic(), lucide-react,
+// marked, a dozen component modules) that has no business being loaded
+// just to read a string array in a plain tsx test.
 import { STARTER_SUGGESTIONS } from '../app/starterSuggestions'
 
 let checks = 0

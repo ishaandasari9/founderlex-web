@@ -1425,7 +1425,6 @@ input { font-family: inherit; }
 }
 
 .chat-input-area {
-  position: relative;
   padding: 8px 4px 20px;
   flex-shrink: 0;
 }
@@ -1450,53 +1449,6 @@ input { font-family: inherit; }
   font-family: var(--font-newsreader), Georgia, serif;
   font-size: 16px;
   color: #2A2420;
-}
-
-.chat-input-suggestions {
-  position: absolute;
-  left: 4px;
-  right: 4px;
-  bottom: 100%;
-  margin: 0 0 8px;
-  padding: 6px;
-  list-style: none;
-  background: #FFFFFF;
-  border: 1px solid rgba(42, 36, 32, 0.14);
-  border-radius: 15px;
-  box-shadow: 0 20px 40px -18px rgba(42, 36, 32, 0.4);
-  max-height: 260px;
-  overflow-y: auto;
-  z-index: 20;
-}
-
-.chat-input-suggestion {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  border: none;
-  background: none;
-  border-radius: 10px;
-  padding: 9px 12px;
-  font-family: var(--font-newsreader), Georgia, serif;
-  font-size: 14.5px;
-  color: #2A2420;
-  text-align: left;
-  cursor: pointer;
-}
-
-.chat-input-suggestion:hover,
-.chat-input-suggestion--active {
-  background: #F2EAE0;
-}
-
-.chat-input-hint {
-  margin: 10px 0 0;
-  padding-left: 4px;
-  font-family: var(--font-newsreader), Georgia, serif;
-  font-size: 12.5px;
-  line-height: 1.4;
-  color: #9B8F82;
 }
 
 .chat-input-disclaimer {

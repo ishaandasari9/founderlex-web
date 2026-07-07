@@ -313,41 +313,6 @@ function Chip({ label, onSelect }: { label: string; onSelect: (t: string) => voi
   )
 }
 
-// ── Chat-input suggestions dropdown (Google-search-style autocomplete) ──────
-// mousedown (not click) fires the selection so it runs before the input's
-// onBlur — preventing default there keeps focus in the input instead of
-// letting the blur-close timer race the click.
-function InputSuggestionsDropdown({
-  suggestions, activeIndex, onSelect, onHover,
-}: {
-  suggestions: string[]
-  activeIndex: number
-  onSelect: (s: string) => void
-  onHover: (i: number) => void
-}) {
-  if (suggestions.length === 0) return null
-  return (
-    <ul id="chat-input-suggestions" className="chat-input-suggestions" role="listbox" aria-label="Suggested questions">
-      {suggestions.map((s, i) => (
-        <li key={s}>
-          <button
-            type="button"
-            id={`chat-input-suggestion-${i}`}
-            role="option"
-            aria-selected={i === activeIndex}
-            className={`chat-input-suggestion${i === activeIndex ? ' chat-input-suggestion--active' : ''}`}
-            onMouseDown={e => { e.preventDefault(); onSelect(s) }}
-            onMouseEnter={() => onHover(i)}
-          >
-            <Search size={13} color={FAINT} strokeWidth={1.8} aria-hidden />
-            <span>{s}</span>
-          </button>
-        </li>
-      ))}
-    </ul>
-  )
-}
-
 // ── Back link ─────────────────────────────────────────────────────────────────
 function BackLink({ label, onClick }: { label: string; onClick: () => void }) {
   const [hov, setHov] = useState(false)
@@ -999,8 +964,6 @@ function LeftRail({
 export default function Home() {
   const [act, setAct]               = useState<Act>('door')
   const [draft, setDraft]           = useState('')
-  const [suggestionsOpen, setSuggestionsOpen] = useState(false)
-  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1)
   const [messages, setMessages]     = useState<Msg[]>([])
   const [isLoading, setIsLoading]   = useState(false)
   const [profile, setProfile]       = useState<FounderProfile | null>(null)
@@ -1194,29 +1157,6 @@ export default function Home() {
   }, [])
 
   const handleCancelConfirm = useCallback(() => setConfirmPanel(null), [])
-
-  // Chat-input suggestions: filters the shared starter list against what's
-  // typed so far, Google-search-autocomplete style. Empty input shows the
-  // full list rather than nothing, since a total beginner staring at a blank
-  // box is exactly who this is for.
-  const filteredSuggestions = useMemo(() => {
-    const q = draft.trim().toLowerCase()
-    if (!q) return STARTER_SUGGESTIONS
-    return STARTER_SUGGESTIONS.filter(s => s.toLowerCase().includes(q))
-  }, [draft])
-
-  const closeSuggestions = useCallback(() => {
-    setSuggestionsOpen(false)
-    setActiveSuggestionIndex(-1)
-  }, [])
-
-  // Selecting a suggestion (click or Enter) fills it in and sends it in one
-  // step, same as the empty-chat Chip buttons already do — no separate
-  // "fill then press send" step for someone who doesn't know what to type.
-  const handleSelectSuggestion = useCallback((text: string) => {
-    closeSuggestions()
-    sendMessage(text)
-  }, [closeSuggestions, sendMessage])
 
   const isWide = useMediaQuery('(min-width: 1280px)')
   const isTablet = useMediaQuery('(min-width: 1024px) and (max-width: 1279px)')
@@ -1730,15 +1670,14 @@ export default function Home() {
           {/* 3 interactive glass step cards */}
           <div className="about-step-cards" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 14, width: '100%', maxWidth: 880 }}>
             {([
-              { icon: <MessageSquareText size={20} color={RED} strokeWidth={1.6} />, step: '01 · Ask', title: 'Say it in your own words', body: 'Describe what you’re building. No legal vocabulary required.' },
-              { icon: <BookOpen size={20} color={RED} strokeWidth={1.6} />, step: '02 · Understand', title: 'Understand the basics', body: 'Plain explanations of what matters and why, honest about limits, and clear when it’s time for a lawyer.' },
-              { icon: <FileText size={20} color={RED} strokeWidth={1.6} />, step: '03 · Draft', title: 'Draft with your details', body: 'Starter documents in your words, filled in with your specifics. Yours to review, edit, and take to a lawyer.' },
-            ] as const).map(({ icon, step, title, body }) => (
+              { icon: <MessageSquareText size={20} color={RED} strokeWidth={1.6} />, step: '01 · Ask', line: 'Describe what you’re building — no legal vocabulary required.' },
+              { icon: <BookOpen size={20} color={RED} strokeWidth={1.6} />, step: '02 · Understand', line: 'Get plain-English answers, honest about limits and when to call a lawyer.' },
+              { icon: <FileText size={20} color={RED} strokeWidth={1.6} />, step: '03 · Draft', line: 'Draft starter documents filled in with your details, ready for a lawyer’s review.' },
+            ] as const).map(({ icon, step, line }) => (
               <GlassCard key={step} className="about-step-card" style={{ flex: '1 1 240px', minWidth: 230, padding: '24px 22px', display: 'flex', flexDirection: 'column', gap: 11 }}>
                 <span style={{ width: 40, height: 40, borderRadius: 11, background: 'rgba(242,234,224,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{icon}</span>
                 <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '0.16em', textTransform: 'uppercase', color: FAINT }}>{step}</div>
-                <h3 style={{ margin: 0, fontFamily: BRICOLAGE, fontWeight: 600, fontSize: 18, lineHeight: 1.2, color: INK }}>{title}</h3>
-                <p style={{ margin: 0, fontSize: 15.5, lineHeight: 1.55, color: MUTED }}>{body}</p>
+                <p style={{ margin: 0, fontSize: 15.5, lineHeight: 1.55, color: INK }}>{line}</p>
               </GlassCard>
             ))}
           </div>
@@ -1784,10 +1723,8 @@ export default function Home() {
                 </p>
                 <ul className="about-trust-list">
                   <li>Active disputes: lawsuits, cease-and-desist letters, or threats of legal action</li>
-                  <li>Fundraising and securities questions</li>
-                  <li>Immigration and visa status</li>
-                  <li>Tax strategy and elections (e.g. S-Corp timing)</li>
-                  <li>Anything criminal or law-enforcement related</li>
+                  <li>Fundraising, securities, and tax strategy questions</li>
+                  <li>Immigration status, and anything criminal or law-enforcement related</li>
                 </ul>
               </GlassCard>
 
@@ -1801,12 +1738,9 @@ export default function Home() {
                   Our explanations draw on curated reference material, not invented rules. When we cite a source, it&apos;s one we actually use:
                 </p>
                 <ul className="about-trust-list about-trust-list--sources">
-                  <li><strong>IRS.gov</strong>: EIN, Form 1023, Form 990, 501(c)(3) basics</li>
-                  <li><strong>Internal Revenue Code § 501(c)(3)</strong>: nonprofit purpose requirements</li>
-                  <li><strong>USPTO.gov</strong>: trademark search and filing</li>
-                  <li><strong>copyright.gov</strong>: copyright registration</li>
-                  <li><strong>35 U.S.C. §§ 101-103</strong>: patentability standards</li>
-                  <li><strong>State Secretary of State offices</strong>: LLC and corporation formation</li>
+                  <li><strong>IRS.gov &amp; IRC § 501(c)(3)</strong>: EIN, Form 1023/990, and nonprofit purpose basics</li>
+                  <li><strong>USPTO.gov &amp; 35 U.S.C. §§ 101-103</strong>: trademark filing and patentability standards</li>
+                  <li><strong>copyright.gov &amp; state Secretary of State offices</strong>: copyright, LLC, and corporation filing</li>
                 </ul>
               </GlassCard>
 
@@ -1817,7 +1751,7 @@ export default function Home() {
                 <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '0.16em', textTransform: 'uppercase', color: FAINT }}>Your conversation</div>
                 <h3 style={{ margin: 0, fontFamily: BRICOLAGE, fontWeight: 600, fontSize: 18, lineHeight: 1.2, color: INK }}>Saved privately, on your terms</h3>
                 <p style={{ margin: 0, fontSize: 15.5, lineHeight: 1.55, color: MUTED }}>
-                  No login required. Your session is saved anonymously on our server so you can pick up where you left off if you return on the same device. It&apos;s kept private, not shared or sold, and you can clear it anytime with <strong style={{ fontWeight: 600, color: INK }}>Clear conversation</strong> in the chat header.
+                  No login required. Your session is saved anonymously so you can pick up where you left off — kept private, never shared or sold, and clearable anytime with <strong style={{ fontWeight: 600, color: INK }}>Clear conversation</strong> in the chat header.
                 </p>
               </GlassCard>
             </div>
@@ -2043,61 +1977,18 @@ export default function Home() {
               </div>
 
               <div className="chat-input-area">
-                {suggestionsOpen && !isLoading && (
-                  <InputSuggestionsDropdown
-                    suggestions={filteredSuggestions}
-                    activeIndex={activeSuggestionIndex}
-                    onSelect={handleSelectSuggestion}
-                    onHover={setActiveSuggestionIndex}
-                  />
-                )}
                 <div className="chat-input-bar">
                   <input
                     value={draft}
-                    onChange={e => { setDraft(e.target.value); setSuggestionsOpen(true); setActiveSuggestionIndex(-1) }}
-                    onFocus={() => { setSuggestionsOpen(true); setActiveSuggestionIndex(-1) }}
-                    onBlur={() => { window.setTimeout(closeSuggestions, 120) }}
-                    onKeyDown={e => {
-                      if (suggestionsOpen && filteredSuggestions.length > 0) {
-                        if (e.key === 'ArrowDown') {
-                          e.preventDefault()
-                          setActiveSuggestionIndex(i => (i + 1) % filteredSuggestions.length)
-                          return
-                        }
-                        if (e.key === 'ArrowUp') {
-                          e.preventDefault()
-                          setActiveSuggestionIndex(i => (i <= 0 ? filteredSuggestions.length - 1 : i - 1))
-                          return
-                        }
-                        if (e.key === 'Escape') {
-                          e.preventDefault()
-                          closeSuggestions()
-                          return
-                        }
-                        if (e.key === 'Enter' && !e.shiftKey && activeSuggestionIndex >= 0) {
-                          e.preventDefault()
-                          handleSelectSuggestion(filteredSuggestions[activeSuggestionIndex])
-                          return
-                        }
-                      }
-                      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(draft) }
-                    }}
+                    onChange={e => setDraft(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(draft) } }}
                     aria-label="Ask FounderLex a question"
                     placeholder="Describe what you're building, or ask a legal-basics question…"
                     disabled={isLoading}
-                    role="combobox"
-                    aria-haspopup="listbox"
-                    aria-expanded={suggestionsOpen && filteredSuggestions.length > 0}
-                    aria-controls="chat-input-suggestions"
-                    aria-autocomplete="list"
-                    aria-activedescendant={activeSuggestionIndex >= 0 ? `chat-input-suggestion-${activeSuggestionIndex}` : undefined}
                   />
                   <MicButton value={draft} onChange={setDraft} disabled={isLoading} />
                   <SendButton onClick={() => sendMessage(draft)} disabled={isLoading || !draft.trim()} />
                 </div>
-                <p className="chat-input-hint">
-                  Not sure what to ask? Pick a suggestion — plain words are fine, no legal terms needed.
-                </p>
                 <p className="chat-input-disclaimer">
                   <ShieldCheck size={12} color={FAINT} strokeWidth={1.6} aria-hidden />
                   Educational, not legal advice. Session saved anonymously — clear anytime.
