@@ -19,25 +19,28 @@ export default function BeforeYouSignChecklist({
   const toggle = (id: string) => setChecked(prev => ({ ...prev, [id]: !prev[id] }))
 
   return (
-    <div style={{
-      maxWidth: 460,
+    <div className="chat-card-hover-reveal" style={{
+      maxWidth: 'min(500px, 100%)',
       width: '100%',
       background: WHITE,
       border: '1px solid rgba(42,36,32,0.12)',
       borderRadius: 14,
       padding: '18px 20px',
+      boxShadow: '0 10px 26px -16px rgba(42,36,32,0.22)',
       display: 'flex',
       flexDirection: 'column',
       gap: 12,
     }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: FAINT }}>
-          Before you sign
-        </span>
-        <span style={{ fontFamily: 'var(--font-bricolage), sans-serif', fontWeight: 600, fontSize: 15, color: INK }}>
-          {label} checklist
-        </span>
-        <ReadAloudButton text={items.map(item => item.text).join('. ')} label="Read checklist aloud" />
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: FAINT }}>
+            Before you sign
+          </span>
+          <span style={{ fontFamily: 'var(--font-bricolage), sans-serif', fontWeight: 600, fontSize: 15, color: INK }}>
+            {label} checklist
+          </span>
+        </div>
+        <ReadAloudButton text={items.map(item => item.text).join('. ')} label="Read checklist aloud" iconOnly className="chat-card-read-aloud-btn" />
       </div>
 
       <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -78,7 +81,7 @@ export default function BeforeYouSignChecklist({
 
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7, paddingTop: 6, borderTop: '1px solid rgba(42,36,32,0.08)' }}>
         <ShieldCheck size={12} color={FAINT} strokeWidth={1.6} style={{ marginTop: 2, flexShrink: 0 }} aria-hidden />
-        <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: 10, lineHeight: 1.6, color: FAINT }}>
+        <span style={{ fontFamily: 'var(--font-newsreader), Georgia, serif', fontSize: 12.5, lineHeight: 1.4, color: FAINT }}>
           Educational, not legal advice. FounderLex is not a law firm — have a licensed attorney review before you sign, file, or rely on this.
         </span>
       </div>

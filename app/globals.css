@@ -128,6 +128,13 @@ input { font-family: inherit; }
   height: 100%;
 }
 
+/* ─── Chat message entrance (fast fade/slide — the global
+   prefers-reduced-motion override above already collapses this to ~0) ──── */
+@keyframes chat-turn-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 /* ─── Loading dots animation ──────────────────────────────── */
 @keyframes blink {
   0%, 80%, 100% { opacity: 0.25; transform: scale(0.9); }
@@ -663,12 +670,13 @@ input { font-family: inherit; }
 }
 
 .chat-draft-quantity {
-  max-width: min(520px, 100%);
+  max-width: min(500px, 100%);
   width: 100%;
   background: #FFFFFF;
   border: 1px solid rgba(42, 36, 32, 0.12);
   border-radius: 14px;
-  padding: 16px 18px;
+  padding: 18px 20px;
+  box-shadow: 0 10px 26px -16px rgba(42, 36, 32, 0.22);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -729,7 +737,7 @@ input { font-family: inherit; }
   flex-direction: column;
   gap: 12px;
   width: 100%;
-  max-width: min(520px, 100%);
+  max-width: min(500px, 100%);
 }
 
 .chat-artifact__header--static {
@@ -1063,7 +1071,7 @@ input { font-family: inherit; }
   padding: 26px 4px 16px;
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 27px;
 }
 
 .chat-turn {
@@ -1071,14 +1079,11 @@ input { font-family: inherit; }
   gap: 11px;
   align-items: flex-start;
   max-width: 100%;
+  animation: chat-turn-in 240ms ease-out both;
 }
 
 .chat-turn--user {
   justify-content: flex-end;
-}
-
-.chat-turn--card {
-  padding-left: 39px;
 }
 
 .chat-bubble {
@@ -1088,17 +1093,20 @@ input { font-family: inherit; }
   font-size: 16.5px;
   line-height: 1.55;
   white-space: pre-wrap;
+  box-shadow: 0 3px 10px -6px rgba(42, 36, 32, 0.16);
 }
 
 .chat-bubble--bot {
   background: #F2EAE0;
   color: #2A2420;
+  border: 1px solid rgba(42, 36, 32, 0.06);
   border-radius: 4px 16px 16px 16px;
 }
 
 .chat-bubble--user {
   background: #2A2420;
   color: #F7F2EB;
+  border: 1px solid rgba(0, 0, 0, 0.14);
   border-radius: 16px 16px 4px 16px;
 }
 
@@ -1136,16 +1144,16 @@ input { font-family: inherit; }
 }
 
 .chat-doc-offer {
-  max-width: min(480px, 100%);
+  max-width: min(500px, 100%);
   width: 100%;
   background: #FFFFFF;
   border: 1px solid rgba(42, 36, 32, 0.12);
   border-radius: 14px;
-  padding: 16px 18px;
+  padding: 18px 20px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  box-shadow: 0 10px 28px -16px rgba(42, 36, 32, 0.25);
+  box-shadow: 0 10px 26px -16px rgba(42, 36, 32, 0.22);
 }
 
 .chat-doc-offer__header {
@@ -1220,13 +1228,13 @@ input { font-family: inherit; }
 }
 
 .chat-artifact {
-  max-width: min(520px, 100%);
+  max-width: min(500px, 100%);
   width: 100%;
   background: #FFFFFF;
   border: 1px solid rgba(42, 36, 32, 0.12);
   border-radius: 14px;
   overflow: hidden;
-  box-shadow: 0 12px 32px -18px rgba(42, 36, 32, 0.28);
+  box-shadow: 0 10px 26px -16px rgba(42, 36, 32, 0.22);
 }
 
 .chat-artifact__header {
@@ -1338,17 +1346,46 @@ input { font-family: inherit; }
   display: flex;
   align-items: center;
   gap: 8px;
-  opacity: 0;
-  transition: opacity 0.15s ease;
 }
 
-.chat-turn--bot:hover .chat-bot-actions,
-.chat-turn--bot:focus-within .chat-bot-actions {
-  opacity: 1;
-}
+/* Same hover/focus-reveal pattern for the bot-message actions row and the
+   checklist/red-flag card read-aloud buttons. Scoped to devices that can
+   actually hover (a real mouse/trackpad always hovers before it clicks, so
+   pointer-events: none while hidden is safe there — no invisible-but-
+   clickable gap). Touch devices don't produce :hover or :focus-within from
+   a tap, so outside this query these controls are left at their default
+   opacity 1 / pointer-events auto: always visible, always tappable, rather
+   than permanently unreachable behind a reveal gesture that can't fire. */
+@media (hover: hover) and (pointer: fine) {
+  .chat-bot-actions {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+  }
 
-.chat-read-aloud-btn:focus-visible {
-  opacity: 1;
+  .chat-turn--bot:hover .chat-bot-actions,
+  .chat-turn--bot:focus-within .chat-bot-actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .chat-read-aloud-btn:focus-visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .chat-card-read-aloud-btn {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+  }
+
+  .chat-card-hover-reveal:hover .chat-card-read-aloud-btn,
+  .chat-card-hover-reveal:focus-within .chat-card-read-aloud-btn,
+  .chat-card-read-aloud-btn:focus-visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 
 .chat-checklist-link {
