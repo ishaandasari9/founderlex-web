@@ -1227,6 +1227,26 @@ input { font-family: inherit; }
   cursor: wait;
 }
 
+.chat-doc-offer__link {
+  font-family: var(--font-bricolage), sans-serif;
+  font-weight: 600;
+  font-size: 13.5px;
+  color: #DB1A1A;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.chat-doc-offer__link:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.chat-doc-offer__link:disabled {
+  color: #9B8F82;
+  cursor: wait;
+}
+
 .chat-artifact {
   max-width: min(500px, 100%);
   width: 100%;

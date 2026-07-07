@@ -9,9 +9,10 @@ import {
   ChevronLeft, ChevronRight, X, Check, Circle, CircleDot,
 } from 'lucide-react'
 import { marked } from 'marked'
+import JSZip from 'jszip'
 import { validateProfile, emptyProfile, type FounderProfile } from '@/lib/founderProfile'
 import type { ConfirmField } from '@/lib/confirmationFields'
-import { buildLawyerReviewEmail, type GeneratedDoc } from '@/lib/lawyerReviewEmail'
+import { buildLawyerReviewEmail, extractBlanks, type GeneratedDoc } from '@/lib/lawyerReviewEmail'
 import ConfirmDocPanel, { type ConfirmPanelState } from '@/components/ConfirmDocPanel'
 import ConfirmPackPanel, { type ConfirmPackPanelState } from '@/components/ConfirmPackPanel'
 import ConsentGate from '@/components/ConsentGate'
@@ -106,12 +107,19 @@ const MONO       = 'var(--font-mono), monospace'
 // keys, using the exact same keyword list this file already used for
 // doc-card detection, not a second copy.
 
-// ── Download helper ───────────────────────────────────────────────────────────
+// ── Download helpers ───────────────────────────────────────────────────────────
 function downloadBase64(b64: string, name: string, mime: string) {
   const bytes = atob(b64)
   const arr = new Uint8Array(bytes.length)
   for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i)
   const url = URL.createObjectURL(new Blob([arr], { type: mime }))
+  const a = document.createElement('a')
+  a.href = url; a.download = name; a.click()
+  URL.revokeObjectURL(url)
+}
+
+function downloadBlob(blob: Blob, name: string) {
+  const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url; a.download = name; a.click()
   URL.revokeObjectURL(url)
@@ -127,7 +135,11 @@ type GenerateResult = {
   pdf_name?: string
 }
 
-async function generateAndDownload(
+// Fetches the filled preview + docx/pdf payloads but never triggers a
+// download itself — generating a document should feel like Claude
+// producing an artifact: the caller renders the preview, and download is a
+// distinct, explicit action the user takes only when ready.
+async function generateDocument(
   templateName: string,
   profile: FounderProfile | null
 ): Promise<GenerateResult> {
@@ -140,8 +152,6 @@ async function generateAndDownload(
     const data = await res.json()
     if (data.error) return { ok: false, error: data.error }
 
-    if (data.pdf_b64)  downloadBase64(data.pdf_b64,  data.pdf_name  || 'document.pdf',  'application/pdf')
-    if (data.docx_b64) downloadBase64(data.docx_b64, data.docx_name || 'document.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
     return {
       ok: true,
       filled: data.filled,
@@ -163,27 +173,77 @@ type SessionGeneratedDoc = GeneratedDoc & {
   pdf_name?: string
 }
 
-// B2 Founder Pack: same fetch-and-download shape as generateAndDownload
-// above, but hits /api/founder-pack and downloads one zip instead of a
-// docx/pdf pair. Returns the cover memo + doc list on success so the caller
-// can surface them in the chat.
-async function generateFounderPackAndDownload(
-  profile: FounderProfile | null
-): Promise<{ ok: boolean; error?: string; coverMemo?: string; docs?: { template_name: string; label: string; filled: string }[] }> {
-  try {
-    const res = await fetch('/api/founder-pack', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ profile }),
-    })
-    const data = await res.json()
-    if (data.error) return { ok: false, error: data.error }
+// Upserts by template so regenerating a document (the "Update draft" path)
+// refreshes the existing entry everywhere it's referenced — the preview
+// panel, its tabs, and any inline chat artifact — instead of appending a
+// stale duplicate alongside the fresh one.
+function upsertGeneratedDoc(prev: SessionGeneratedDoc[], doc: SessionGeneratedDoc): SessionGeneratedDoc[] {
+  const idx = prev.findIndex(d => d.template === doc.template)
+  if (idx === -1) return [...prev, doc]
+  const next = [...prev]
+  next[idx] = doc
+  return next
+}
 
-    if (data.zip_b64) downloadBase64(data.zip_b64, data.zip_name || 'founder-pack.zip', 'application/zip')
-    return { ok: true, coverMemo: data.cover_memo, docs: data.docs }
-  } catch (e: unknown) {
-    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+// Plain-English "what's included" + outstanding-blanks memo for the
+// client-built zip below — a smaller, dependency-free stand-in for
+// lib/founderPack.ts's buildCoverMemo. That helper can't be imported here:
+// lib/founderPack.ts transitively imports lib/generateDocument.ts (fs,
+// pdfkit, html-to-docx), which can't be bundled for the browser. Reuses
+// extractBlanks from lib/lawyerReviewEmail.ts, which page.tsx already
+// imports client-side with no such issue.
+function buildClientCoverMemo(docs: SessionGeneratedDoc[], profile: FounderProfile | null): string {
+  const companyName = profile?.company_name || 'your company'
+  const lines: string[] = []
+  lines.push(`Your FounderLex documents — ${docs.length} document${docs.length === 1 ? '' : 's'} for ${companyName}`)
+  lines.push('')
+  lines.push("What's included:")
+  for (const d of docs) lines.push(`- ${d.label}`)
+
+  const blanksByDoc = docs
+    .map(d => ({ label: d.label, blanks: extractBlanks(d.filled) }))
+    .filter(d => d.blanks.length > 0)
+
+  lines.push('')
+  if (blanksByDoc.length > 0) {
+    lines.push('Blanks still need filling in before any of these are ready to sign or file:')
+    for (const d of blanksByDoc) lines.push(`- ${d.label}: ${d.blanks.join('; ')}`)
+  } else {
+    lines.push(
+      'No [TO BE COMPLETED] blanks are left in these drafts based on what you told FounderLex — but double-check every field before relying on them.',
+    )
   }
+
+  lines.push('')
+  lines.push(
+    'Have a licensed attorney review every document in this pack before you sign, file, or send it to anyone. FounderLex is an educational tool, not a law firm, and nothing here is legal advice.',
+  )
+  return lines.join('\n')
+}
+
+// "Download all": zips whatever is already in generatedDocs — the exact
+// same docx_b64/pdf_b64 bytes backing the previews the user is looking at
+// — entirely client-side, rather than asking the server to regenerate a
+// pack from profileRef.current. Regenerating server-side could silently
+// diverge from what's on screen: profileRef.current doesn't include edits
+// made only inside the confirm-fields panel, and /api/founder-pack
+// resolves its own template set from the profile rather than from whatever
+// the user actually confirmed and generated. Building the zip from the
+// already-generated bytes makes that drift impossible by construction.
+async function buildGeneratedDocsZip(
+  docs: SessionGeneratedDoc[],
+  profile: FounderProfile | null,
+): Promise<{ blob: Blob; name: string } | null> {
+  const withFiles = docs.filter(d => d.docx_b64 && d.docx_name && d.pdf_b64 && d.pdf_name)
+  if (withFiles.length === 0) return null
+  const zip = new JSZip()
+  for (const doc of withFiles) {
+    zip.file(doc.docx_name!, doc.docx_b64!, { base64: true })
+    zip.file(doc.pdf_name!, doc.pdf_b64!, { base64: true })
+  }
+  zip.file('Cover Memo.txt', buildClientCoverMemo(withFiles, profile))
+  const blob = await zip.generateAsync({ type: 'blob' })
+  return { blob, name: 'founderlex-documents.zip' }
 }
 
 // ── Door glyph ───────────────────────────────────────────────────────────────
@@ -369,10 +429,11 @@ function BackChatLink({ onClick }: { onClick: () => void }) {
 
 // ── Document card — chat-first draft CTA ────────────────────────────────────
 function DocCard({
-  template, onGenerate, generating, alreadyGenerated = false, quantitySelected = false,
+  template, onGenerate, onRegenerate, generating, alreadyGenerated = false, quantitySelected = false,
 }: {
   template: string
   onGenerate: () => void
+  onRegenerate?: () => void
   generating: boolean
   alreadyGenerated?: boolean
   quantitySelected?: boolean
@@ -390,25 +451,37 @@ function DocCard({
       </div>
       <p className="chat-doc-offer__desc">
         {alreadyGenerated
-          ? 'This document is already drafted — scroll down to read the full version in the chat.'
+          ? 'This document is already drafted — scroll down to review the preview, or update it with anything new you’ve told me since.'
           : quantitySelected
-            ? 'Confirm your details on the next screen, then your draft will appear right here in the chat.'
+            ? 'Confirm your details on the next screen, then a preview will appear right here in the chat — nothing downloads until you choose to.'
             : 'Choose one or three documents above, then continue here.'}
       </p>
-      <button
-        type="button"
-        className="chat-doc-offer__btn"
-        onClick={generating ? undefined : onGenerate}
-        disabled={generating || (!alreadyGenerated && !quantitySelected)}
-      >
-        {generating ? (
-          <><span className="loading-dot" /><span className="loading-dot" /><span className="loading-dot" /></>
-        ) : alreadyGenerated ? (
-          <><FileText size={14} strokeWidth={2} /> View in chat</>
-        ) : (
-          <><Download size={14} strokeWidth={2} /> Review &amp; generate</>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          className="chat-doc-offer__btn"
+          onClick={generating ? undefined : onGenerate}
+          disabled={generating || (!alreadyGenerated && !quantitySelected)}
+        >
+          {generating ? (
+            <><span className="loading-dot" /><span className="loading-dot" /><span className="loading-dot" /></>
+          ) : alreadyGenerated ? (
+            <><FileText size={14} strokeWidth={2} /> View draft</>
+          ) : (
+            <><Download size={14} strokeWidth={2} /> Review &amp; generate</>
+          )}
+        </button>
+        {alreadyGenerated && onRegenerate && (
+          <button
+            type="button"
+            className="chat-doc-offer__link"
+            onClick={generating ? undefined : onRegenerate}
+            disabled={generating}
+          >
+            Update draft
+          </button>
         )}
-      </button>
+      </div>
     </div>
   )
 }
@@ -434,7 +507,7 @@ function DraftQuantityPicker({
         >
           <span className="chat-draft-quantity__option-label">One document</span>
           <span className="chat-draft-quantity__option-desc">
-            Draft <strong>{label}</strong> only — the full preview stays right here in the chat.
+            Draft <strong>{label}</strong> only — preview it here in the chat and in the side panel, download whenever you're ready.
           </span>
         </button>
         <button
@@ -453,14 +526,22 @@ function DraftQuantityPicker({
 }
 
 function ChatDocumentArtifact({
-  doc, onOpenPreview, inlineFull = false,
+  doc, onOpenPreview, onRegenerate, inlineFull = false,
 }: {
   doc: SessionGeneratedDoc
   onOpenPreview?: () => void
+  onRegenerate?: () => void
   inlineFull?: boolean
 }) {
   const excerpt = markdownExcerpt(doc.filled)
   const fullHtml = useMemo(() => renderMarkdown(doc.filled), [doc.filled])
+  // docx_b64/pdf_b64 are never persisted across a saved session (they'd
+  // blow well past the session payload's size cap) — so a doc-artifact
+  // restored after a refresh has the text preview back but not the binary
+  // download payloads. Offer a one-click way to regenerate right here
+  // instead of leaving the reader stranded on a preview with no visible
+  // way to ever download it.
+  const hasDownloads = !!doc.docx_b64 || !!doc.pdf_b64
   return (
     <div className="chat-artifact">
       <div className="chat-artifact__header chat-artifact__header--static">
@@ -502,6 +583,11 @@ function ChatDocumentArtifact({
             onClick={() => downloadBase64(doc.pdf_b64!, doc.pdf_name || 'document.pdf', 'application/pdf')}
           >
             PDF
+          </button>
+        )}
+        {!hasDownloads && onRegenerate && (
+          <button type="button" className="chat-artifact__link" onClick={onRegenerate}>
+            Regenerate to download
           </button>
         )}
       </div>
@@ -730,13 +816,15 @@ function DownloadBtn({
 }
 
 function DocPreviewPanel({
-  docs, selectedTemplate, onSelectTemplate, onClose, inDrawer = false,
+  docs, selectedTemplate, onSelectTemplate, onClose, inDrawer = false, onDownloadAll, downloadingAll = false,
 }: {
   docs: SessionGeneratedDoc[]
   selectedTemplate: string | null
   onSelectTemplate: (template: string) => void
   onClose: () => void
   inDrawer?: boolean
+  onDownloadAll?: () => void
+  downloadingAll?: boolean
 }) {
   const selected = docs.find(d => d.template === selectedTemplate) ?? docs[docs.length - 1] ?? null
   const html = useMemo(
@@ -756,7 +844,7 @@ function DocPreviewPanel({
         <div className="chat-doc-preview-empty">
           <FileText size={32} color={FAINT} strokeWidth={1.4} aria-hidden />
           <p>No document yet</p>
-          <span>When you choose <strong>Three documents</strong>, drafts will appear here. Choose <strong>One document</strong> to keep everything in the chat.</span>
+          <span>Generate a document from the chat and its preview will appear here — download Word or PDF whenever you're ready.</span>
         </div>
       </div>
     )
@@ -773,6 +861,13 @@ function DocPreviewPanel({
           </div>
         </div>
         <div className="chat-doc-preview__toolbar-right">
+          {docs.length > 1 && onDownloadAll && (
+            <DownloadBtn
+              label={downloadingAll ? 'Zipping…' : 'Download all'}
+              disabled={downloadingAll}
+              onClick={onDownloadAll}
+            />
+          )}
           <DownloadBtn
             label="Word"
             disabled={!selected?.docx_b64}
@@ -1200,39 +1295,43 @@ export default function Home() {
     if (!confirmPanel) return
     setConfirmGenerating(true)
     const effectiveProfile = buildEffectiveProfile(profileRef.current, confirmPanel)
-    const result = await generateAndDownload(confirmPanel.template, effectiveProfile)
+    const result = await generateDocument(confirmPanel.template, effectiveProfile)
     setConfirmGenerating(false)
     if (result.ok) {
-      const label = TEMPLATE_LABELS[confirmPanel.template] ?? confirmPanel.template
+      const template = confirmPanel.template
+      const label = TEMPLATE_LABELS[template] ?? template
       const filled = result.filled ?? ''
-      setDocCount(prev => prev + 1)
-      setGeneratedDocs(prev => [...prev, {
-        template: confirmPanel.template,
+      // Upserting (not appending) means "Update draft" refreshes the same
+      // entry everywhere it's shown, so only a genuinely new template
+      // increments the "documents drafted" counter.
+      const isUpdate = generatedDocs.some(d => d.template === template)
+      if (!isUpdate) setDocCount(prev => prev + 1)
+      setGeneratedDocs(prev => upsertGeneratedDoc(prev, {
+        template,
         label,
         filled,
         docx_b64: result.docx_b64,
         docx_name: result.docx_name,
         pdf_b64: result.pdf_b64,
         pdf_name: result.pdf_name,
-      }])
+      }))
+      // Preview-first, download-second applies to every mode now — the
+      // right preview panel always opens, in addition to single-doc's
+      // existing full inline chat preview.
+      setSidePreviewEnabled(true)
+      openDocPreview(template)
       const singleMode = activeDraftModeRef.current === 'single'
-      if (singleMode) {
-        setSidePreviewEnabled(false)
-      } else {
-        setSidePreviewEnabled(true)
-        openDocPreview(confirmPanel.template)
-      }
       setMessages(prev => {
         const next: Msg[] = [
           ...prev,
           {
             role: 'bot',
-            text: singleMode
-              ? `Your **${label}** is ready. Word and PDF copies are downloading now — the full draft is below in the chat.`
-              : `Your **${label}** is ready. Word and PDF copies are downloading now — review the draft below and in the preview panel.`,
+            text: isUpdate
+              ? `Your **${label}** draft is updated — review the refreshed preview below${singleMode ? '' : ' and in the preview panel'}, then download Word or PDF whenever you're ready.`
+              : `Your **${label}** preview is ready. Review it below${singleMode ? '' : ' and in the preview panel'}, then download Word or PDF whenever you're ready — nothing downloads automatically.`,
           },
-          { role: 'doc-artifact', text: singleMode ? 'inline' : '', template: confirmPanel.template, filled },
-          { role: 'checklist-card', text: '', template: confirmPanel.template, filled },
+          { role: 'doc-artifact', text: singleMode ? 'inline' : '', template, filled },
+          { role: 'checklist-card', text: '', template, filled },
         ]
         const flags = detectRedFlags(filled)
         if (flags.length > 0) next.push({ role: 'redflag-card', text: '', flags })
@@ -1243,7 +1342,7 @@ export default function Home() {
     } else {
       alert(`Could not generate document: ${result.error ?? 'Unknown error'}`)
     }
-  }, [confirmPanel, persistSession, openDocPreview])
+  }, [confirmPanel, persistSession, openDocPreview, generatedDocs])
 
   // ── B2 Founder Pack: same confirm-then-generate gate as a single document
   // (README-v3 B2: "Keep the confirm-contents gate — a batch action
@@ -1257,7 +1356,15 @@ export default function Home() {
     activeDraftModeRef.current = 'triple'
     setSidePreviewEnabled(true)
     const p = profileRef.current
-    const templateNames = resolveRecommendedTemplates(p ?? emptyProfile())
+    // Capped at 3, same as handleOpenTriplePack below and the "up to 3
+    // recommended starter docs" copy in the One/Three chooser — not just a
+    // UX ceiling. handleConfirmFounderPack now issues one /api/generate
+    // POST per template (for real per-doc download payloads) on top of the
+    // one GET per template already made here, and /api/generate's rate
+    // limit (10/minute) is shared across GET and POST by IP. An uncapped
+    // recommended-document list could fan out past that limit and leave
+    // some documents silently failing to generate.
+    const templateNames = resolveRecommendedTemplates(p ?? emptyProfile()).slice(0, 3)
     if (templateNames.length === 0) {
       alert('No recommended documents yet — chat with FounderLex first so it can recommend what you need.')
       return
@@ -1290,41 +1397,92 @@ export default function Home() {
 
   const handleCancelFounderPack = useCallback(() => setPackConfirm(null), [])
 
+  // Generates every doc in the pack via the same per-template /api/generate
+  // endpoint the single-doc flow uses (called once per template, in
+  // parallel) rather than /api/founder-pack — that endpoint only ever
+  // returns `filled` per doc, never docx_b64/pdf_b64, so individual
+  // Word/PDF downloads for a bundled doc were previously unavailable. The
+  // zip endpoint is still used, but only on demand, by the separate
+  // "Download all" button below.
   const handleConfirmFounderPack = useCallback(async () => {
     if (!packConfirm) return
     setPackGenerating(true)
     const effectiveProfile = buildEffectiveProfile(profileRef.current, packConfirm)
-    const result = await generateFounderPackAndDownload(effectiveProfile)
+    const results = await Promise.all(
+      packConfirm.templateNames.map(async template => ({
+        template,
+        result: await generateDocument(template, effectiveProfile),
+      })),
+    )
     setPackGenerating(false)
-    if (result.ok) {
-      setDocCount(prev => prev + (result.docs?.length ?? packConfirm.templateNames.length))
-      if (result.docs && result.docs.length > 0) {
-        setGeneratedDocs(prev => [
-          ...prev,
-          ...result.docs!.map(d => ({ template: d.template_name, label: d.label, filled: d.filled })),
-        ])
-        openDocPreview(result.docs[0].template_name)
-        setSidePreviewEnabled(true)
-      }
-      setMessages(prev => {
-        const next: Msg[] = [
-          ...prev,
-          { role: 'bot', text: result.coverMemo ?? 'Your three-document pack is ready and downloading now. Open the preview panel to read each draft.' },
-          ...(result.docs ?? []).map(d => ({
-            role: 'doc-artifact' as const,
-            text: '',
-            template: d.template_name,
-            filled: d.filled,
-          })),
-        ]
-        persistSession(next, profileRef.current)
-        return next
-      })
-      setPackConfirm(null)
-    } else {
-      alert(`Could not generate your Founder Pack: ${result.error ?? 'Unknown error'}`)
+
+    const succeeded = results.filter(r => r.result.ok)
+    const failed = results.filter(r => !r.result.ok)
+
+    if (succeeded.length === 0) {
+      alert(`Could not generate your documents: ${failed[0]?.result.error ?? 'Unknown error'}`)
+      return
     }
-  }, [packConfirm, persistSession, openDocPreview])
+
+    const newDocs: SessionGeneratedDoc[] = succeeded.map(({ template, result }) => ({
+      template,
+      label: TEMPLATE_LABELS[template] ?? template,
+      filled: result.filled ?? '',
+      docx_b64: result.docx_b64,
+      docx_name: result.docx_name,
+      pdf_b64: result.pdf_b64,
+      pdf_name: result.pdf_name,
+    }))
+
+    const newCount = newDocs.filter(d => !generatedDocs.some(g => g.template === d.template)).length
+    if (newCount > 0) setDocCount(prev => prev + newCount)
+    setGeneratedDocs(prev => newDocs.reduce(upsertGeneratedDoc, prev))
+    setSidePreviewEnabled(true)
+    openDocPreview(newDocs[0].template)
+
+    setMessages(prev => {
+      const failedLabel = failed.length > 0
+        ? ` (${failed.map(f => TEMPLATE_LABELS[f.template] ?? f.template).join(', ')} couldn't be generated: ${failed[0].result.error ?? 'unknown error'})`
+        : ''
+      const next: Msg[] = [
+        ...prev,
+        {
+          role: 'bot',
+          text: `${newDocs.length} of ${packConfirm.templateNames.length} documents ${newDocs.length === 1 ? 'is' : 'are'} ready to preview below and in the preview panel${failedLabel}. Download Word or PDF for each whenever you're ready — nothing downloads automatically.`,
+        },
+        ...newDocs.map(d => ({
+          role: 'doc-artifact' as const,
+          text: '',
+          template: d.template,
+          filled: d.filled,
+        })),
+      ]
+      persistSession(next, profileRef.current)
+      return next
+    })
+    setPackConfirm(null)
+  }, [packConfirm, persistSession, openDocPreview, generatedDocs])
+
+  const [downloadingAllZip, setDownloadingAllZip] = useState(false)
+
+  // Zips whatever is currently in generatedDocs — built client-side from
+  // the same bytes already backing the previews, on demand, only when the
+  // user clicks this (never automatically).
+  const handleDownloadAllZip = useCallback(async () => {
+    setDownloadingAllZip(true)
+    try {
+      const zip = await buildGeneratedDocsZip(generatedDocs, profileRef.current)
+      if (zip) {
+        downloadBlob(zip.blob, zip.name)
+      } else {
+        alert('No downloadable documents yet.')
+      }
+    } catch (e: unknown) {
+      alert(`Could not prepare the zip download: ${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      setDownloadingAllZip(false)
+    }
+  }, [generatedDocs])
 
   const handleOpenLawyerEmail = useCallback(() => {
     setLawyerEmail(buildLawyerReviewEmail(profileRef.current ?? emptyProfile(), generatedDocs))
@@ -1439,8 +1597,8 @@ export default function Home() {
       icon: <Search size={16} color={RED} strokeWidth={1.6} />, run: () => setShowNameSearch(true),
     },
     {
-      id: 'pack', label: packLoadingFields ? 'Founder pack (loading…)' : 'Founder pack', action: 'Bundles all recommended docs',
-      desc: 'Download every document FounderLex recommended for you in one zip file.',
+      id: 'pack', label: packLoadingFields ? 'Founder pack (loading…)' : 'Founder pack', action: 'Bundles up to 3 recommended docs',
+      desc: 'Download up to 3 of the documents FounderLex recommended for you in one zip file.',
       icon: <Package size={16} color={RED} strokeWidth={1.6} />, run: handleOpenFounderPack, disabled: packLoadingFields,
     },
     {
@@ -1802,6 +1960,10 @@ export default function Home() {
                                 handleStartSingleDraft(m.template!)
                               }
                             }}
+                            onRegenerate={existing ? () => {
+                              activeDraftModeRef.current = 'single'
+                              handleOpenConfirm(m.template!)
+                            } : undefined}
                             generating={generatingTpl === m.template || packLoadingFields}
                           />
                         </div>
@@ -1824,18 +1986,27 @@ export default function Home() {
                           doc={doc}
                           inlineFull={inlineFull}
                           onOpenPreview={inlineFull ? undefined : () => openDocPreview(m.template!)}
+                          onRegenerate={() => {
+                            activeDraftModeRef.current = 'single'
+                            handleOpenConfirm(m.template!)
+                          }}
                         />
                       </div>
                     )
                   }
                   if (m.role === 'checklist-card' && m.template) {
+                    // Same "prefer the live doc, fall back to this
+                    // message's own snapshot" precedence as doc-artifact
+                    // above, so a checklist next to a since-regenerated
+                    // draft reflects the current content, not stale items.
+                    const stored = generatedDocs.find(d => d.template === m.template)
                     return (
                       <div key={i} className="chat-turn chat-turn--bot chat-turn--card">
                         <DoorGlyph w={20} h={22} panelTop={7} outerR={10} innerR={4} />
                         <BeforeYouSignChecklist
                           template={m.template}
                           label={TEMPLATE_LABELS[m.template] ?? m.template}
-                          filled={m.filled ?? ''}
+                          filled={stored?.filled ?? m.filled ?? ''}
                         />
                       </div>
                     )
@@ -1942,6 +2113,8 @@ export default function Home() {
               selectedTemplate={previewTemplate}
               onSelectTemplate={setPreviewTemplate}
               onClose={closeDocPreview}
+              onDownloadAll={handleDownloadAllZip}
+              downloadingAll={downloadingAllZip}
             />
           )}
         </div>
@@ -1989,6 +2162,8 @@ export default function Home() {
                 selectedTemplate={previewTemplate}
                 onSelectTemplate={setPreviewTemplate}
                 onClose={closeDocPreview}
+                onDownloadAll={handleDownloadAllZip}
+                downloadingAll={downloadingAllZip}
                 inDrawer
               />
             </div>
