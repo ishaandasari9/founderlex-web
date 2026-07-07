@@ -29,6 +29,7 @@ import { detectRedFlags, checkAssistantOverstep, type RedFlag } from '@/lib/redF
 import BeforeYouSignChecklist from '@/components/BeforeYouSignChecklist'
 import CitationChip, { type CitationLink } from '@/components/CitationChip'
 import { TEMPLATE_LABELS, detectTemplates, resolveRecommendedTemplates } from '@/lib/templateMeta'
+import { STARTER_SUGGESTIONS } from './starterSuggestions'
 
 // ── React Bits — SSR disabled (motion/react needs window) ────────────────────
 // Cast to any to bypass TypeScript inference quirks from .jsx component files
@@ -249,6 +250,41 @@ function Chip({ label, onSelect }: { label: string; onSelect: (t: string) => voi
       }}>
       {label}
     </button>
+  )
+}
+
+// ── Chat-input suggestions dropdown (Google-search-style autocomplete) ──────
+// mousedown (not click) fires the selection so it runs before the input's
+// onBlur — preventing default there keeps focus in the input instead of
+// letting the blur-close timer race the click.
+function InputSuggestionsDropdown({
+  suggestions, activeIndex, onSelect, onHover,
+}: {
+  suggestions: string[]
+  activeIndex: number
+  onSelect: (s: string) => void
+  onHover: (i: number) => void
+}) {
+  if (suggestions.length === 0) return null
+  return (
+    <ul id="chat-input-suggestions" className="chat-input-suggestions" role="listbox" aria-label="Suggested questions">
+      {suggestions.map((s, i) => (
+        <li key={s}>
+          <button
+            type="button"
+            id={`chat-input-suggestion-${i}`}
+            role="option"
+            aria-selected={i === activeIndex}
+            className={`chat-input-suggestion${i === activeIndex ? ' chat-input-suggestion--active' : ''}`}
+            onMouseDown={e => { e.preventDefault(); onSelect(s) }}
+            onMouseEnter={() => onHover(i)}
+          >
+            <Search size={13} color={FAINT} strokeWidth={1.8} aria-hidden />
+            <span>{s}</span>
+          </button>
+        </li>
+      ))}
+    </ul>
   )
 }
 
@@ -868,6 +904,8 @@ function LeftRail({
 export default function Home() {
   const [act, setAct]               = useState<Act>('door')
   const [draft, setDraft]           = useState('')
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false)
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1)
   const [messages, setMessages]     = useState<Msg[]>([])
   const [isLoading, setIsLoading]   = useState(false)
   const [profile, setProfile]       = useState<FounderProfile | null>(null)
@@ -1061,6 +1099,29 @@ export default function Home() {
   }, [])
 
   const handleCancelConfirm = useCallback(() => setConfirmPanel(null), [])
+
+  // Chat-input suggestions: filters the shared starter list against what's
+  // typed so far, Google-search-autocomplete style. Empty input shows the
+  // full list rather than nothing, since a total beginner staring at a blank
+  // box is exactly who this is for.
+  const filteredSuggestions = useMemo(() => {
+    const q = draft.trim().toLowerCase()
+    if (!q) return STARTER_SUGGESTIONS
+    return STARTER_SUGGESTIONS.filter(s => s.toLowerCase().includes(q))
+  }, [draft])
+
+  const closeSuggestions = useCallback(() => {
+    setSuggestionsOpen(false)
+    setActiveSuggestionIndex(-1)
+  }, [])
+
+  // Selecting a suggestion (click or Enter) fills it in and sends it in one
+  // step, same as the empty-chat Chip buttons already do — no separate
+  // "fill then press send" step for someone who doesn't know what to type.
+  const handleSelectSuggestion = useCallback((text: string) => {
+    closeSuggestions()
+    sendMessage(text)
+  }, [closeSuggestions, sendMessage])
 
   const isWide = useMediaQuery('(min-width: 1280px)')
   const isTablet = useMediaQuery('(min-width: 1024px) and (max-width: 1279px)')
@@ -1704,7 +1765,7 @@ export default function Home() {
                     </div>
                     {messages.length === 0 && !isLoading && (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                        {["Splitting equity with a co-founder", "Hiring my first contractor", "Do I need an NDA?", "Starting a nonprofit"].map(chip => (
+                        {STARTER_SUGGESTIONS.slice(0, 4).map(chip => (
                           <Chip key={chip} label={chip} onSelect={sendMessage} />
                         ))}
                       </div>
@@ -1811,18 +1872,61 @@ export default function Home() {
               </div>
 
               <div className="chat-input-area">
+                {suggestionsOpen && !isLoading && (
+                  <InputSuggestionsDropdown
+                    suggestions={filteredSuggestions}
+                    activeIndex={activeSuggestionIndex}
+                    onSelect={handleSelectSuggestion}
+                    onHover={setActiveSuggestionIndex}
+                  />
+                )}
                 <div className="chat-input-bar">
                   <input
                     value={draft}
-                    onChange={e => setDraft(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(draft) } }}
+                    onChange={e => { setDraft(e.target.value); setSuggestionsOpen(true); setActiveSuggestionIndex(-1) }}
+                    onFocus={() => { setSuggestionsOpen(true); setActiveSuggestionIndex(-1) }}
+                    onBlur={() => { window.setTimeout(closeSuggestions, 120) }}
+                    onKeyDown={e => {
+                      if (suggestionsOpen && filteredSuggestions.length > 0) {
+                        if (e.key === 'ArrowDown') {
+                          e.preventDefault()
+                          setActiveSuggestionIndex(i => (i + 1) % filteredSuggestions.length)
+                          return
+                        }
+                        if (e.key === 'ArrowUp') {
+                          e.preventDefault()
+                          setActiveSuggestionIndex(i => (i <= 0 ? filteredSuggestions.length - 1 : i - 1))
+                          return
+                        }
+                        if (e.key === 'Escape') {
+                          e.preventDefault()
+                          closeSuggestions()
+                          return
+                        }
+                        if (e.key === 'Enter' && !e.shiftKey && activeSuggestionIndex >= 0) {
+                          e.preventDefault()
+                          handleSelectSuggestion(filteredSuggestions[activeSuggestionIndex])
+                          return
+                        }
+                      }
+                      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(draft) }
+                    }}
                     aria-label="Ask FounderLex a question"
                     placeholder="Describe what you're building, or ask a legal-basics question…"
                     disabled={isLoading}
+                    role="combobox"
+                    aria-haspopup="listbox"
+                    aria-expanded={suggestionsOpen && filteredSuggestions.length > 0}
+                    aria-controls="chat-input-suggestions"
+                    aria-autocomplete="list"
+                    aria-activedescendant={activeSuggestionIndex >= 0 ? `chat-input-suggestion-${activeSuggestionIndex}` : undefined}
                   />
                   <MicButton value={draft} onChange={setDraft} disabled={isLoading} />
                   <SendButton onClick={() => sendMessage(draft)} disabled={isLoading || !draft.trim()} />
                 </div>
+                <p className="chat-input-hint">
+                  Not sure what to ask? Pick a suggestion — plain words are fine, no legal terms needed.
+                </p>
                 <p className="chat-input-disclaimer">
                   <ShieldCheck size={12} color={FAINT} strokeWidth={1.6} aria-hidden />
                   Educational, not legal advice. Session saved anonymously — clear anytime.
